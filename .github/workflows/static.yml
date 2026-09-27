@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -15,127 +15,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  patch-toolbar:
-    if: github.event_name == 'push' && !contains(github.event.head_commit.message, 'complete GameNet toolbar')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Complete GameNet toolbar
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const path = 'index.html';
-            const source = fs.readFileSync(path, 'utf8');
-            const marker = "function showPage(title){document.getElementById('title').textContent=title}";
-            if (!source.includes(marker)) { core.setFailed('Toolbar anchor not found'); return; }
-
-            const replacement = String.raw\`
-function toolbarClose(){document.getElementById('detail').innerHTML=''}
-function toolbarModal(title,body,width){
-  document.getElementById('detail').innerHTML='<div class="detail" onclick="if(event.target===this)toolbarClose()"><div class="modal" style="width:'+(width||620)+'px;max-height:88vh;overflow:auto"><button class="close" onclick="toolbarClose()">×</button><div class="eyebrow">GameNet Toolbar</div><h2>'+title+'</h2>'+body+'</div></div>'
-}
-function toolbarMoney(n){return Number(n||0).toLocaleString('fa-IR')+' تومان'}
-function openChargePanel(){
-  toolbarModal('شارژ مشتری',
-    '<div class="grid2"><div><small>مشتری</small><select id="tbCustomer" style="width:100%;height:30px">'+previewCustomers.map(function(c){return '<option value="'+c.id+'">#'+c.id+' • '+c.name+'</option>'}).join('')+'</select></div>'+
-    '<div><small>نرخ ساعتی</small><select id="tbRate" style="width:100%;height:30px"><option value="120000">PC • 120,000</option><option value="150000">PlayStation • 150,000</option><option value="100000">Foosball • 100,000</option></select></div>'+
-    '<div><small>مبلغ پرداختی واقعی</small><input id="tbPaid" type="number" value="100000" style="width:100%;height:30px" oninput="updateChargePreview()"></div>'+
-    '<div><small>درصد رایگان</small><input id="tbPct" type="number" value="10" min="0" max="100" style="width:100%;height:30px" oninput="updateChargePreview()"></div></div>'+
-    '<div class="tariffResult" style="margin-top:10px"><div><small>پرداختی</small><b id="tbPaidOut">100,000 تومان</b></div><div><small>رایگان</small><b id="tbFreeOut">10,000 تومان</b></div><div><small>ارزش کل سرویس</small><b id="tbTotalOut">110,000 تومان</b></div><div><small>زمان معادل</small><b id="tbTimeOut">55:00</b></div></div>'+
-    '<div class="detail-alert" style="margin-top:10px">۱۰۰,۰۰۰ پرداختی + ۱۰٪ = ۱۰,۰۰۰ رایگان + ارزش کل ۱۱۰,۰۰۰ تومان.</div>'+
-    '<div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveChargePanel()">ثبت شارژ</button></div>',660);
-  updateChargePreview()
-}
-function updateChargePreview(){
-  var paid=Number(document.getElementById('tbPaid')?.value||0),pct=Math.max(0,Math.min(100,Number(document.getElementById('tbPct')?.value||0))),rate=Number(document.getElementById('tbRate')?.value||120000),free=Math.round(paid*pct/100),total=paid+free;
-  document.getElementById('tbPaidOut').textContent=toolbarMoney(paid);
-  document.getElementById('tbFreeOut').textContent=toolbarMoney(free);
-  document.getElementById('tbTotalOut').textContent=toolbarMoney(total);
-  document.getElementById('tbTimeOut').textContent=formatRateTime(rate,total)
-}
-function saveChargePanel(){
-  var id=document.getElementById('tbCustomer').value,c=previewCustomers.find(function(x){return x.id===id});
-  if(!c){showToast('مشتری پیدا نشد');return}
-  var paid=Number(document.getElementById('tbPaid').value||0),pct=Number(document.getElementById('tbPct').value||0),free=Math.round(paid*pct/100);
-  c.balance=Number(c.balance||0)+paid;c.freeCredit=Number(c.freeCredit||0)+free;
-  showToast('شارژ ثبت شد • پرداختی '+toolbarMoney(paid)+' • رایگان '+toolbarMoney(free)+' • ارزش کل '+toolbarMoney(paid+free));toolbarClose()
-}
-function openNewDevicePanel(){
-  toolbarModal('دستگاه جدید','<div class="grid2"><div><small>شناسه</small><input id="tbDeviceId" value="PC16" style="width:100%;height:30px"></div><div><small>نوع</small><select id="tbDeviceType" style="width:100%;height:30px"><option value="pc">PC</option><option value="ps">PlayStation</option><option value="fs">Foosball</option></select></div></div><div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveNewDevice()">افزودن</button></div>',560)
-}
-function saveNewDevice(){
-  var id=document.getElementById('tbDeviceId').value.trim().toUpperCase(),type=document.getElementById('tbDeviceType').value;
-  if(!id){showToast('شناسه الزامی است');return}
-  if([].concat(pcs,ps,fs).some(function(x){return x.id===id})){showToast('شناسه تکراری است');return}
-  var rec={id:id,type:type,state:'Ready',customer:'',session:'—',remaining:'—',amount:'—',remainingSeconds:0};
-  if(type==='pc')pcs.push(rec);else if(type==='ps')ps.push(rec);else fs.push(rec);
-  document.getElementById('pcCount').textContent=pcs.length;render();showToast('دستگاه '+id+' اضافه شد');toolbarClose()
-}
-function openToolbarFeature(name){
-  var info={
-    'بازی‌ها':['مدیریت بازی‌ها','Counter-Strike 2 • فعال<br>Valorant • فعال<br>EA FC 26 • فعال'],
-    'آمار':['گزارش‌ها و آمار','درآمد امروز: 4,820,000 تومان<br>Session: 19<br>شارژ: 2,140,000 تومان'],
-    'پرداختی':['پرداختی‌ها','12:04 • Ali R. • نقدی • 420,000<br>11:52 • Sina M. • کارت • 240,000'],
-    'تنظیمات':['تنظیمات','نام گیم‌نت: GameNet 98<br>شعبه: Main<br>هشدار Session: 10 دقیقه'],
-    'پشتیبان':['پشتیبان‌گیری','ساخت فایل JSON از مشتریان و تنظیمات Preview'],
-    'بازیابی':['بازیابی','انتخاب فایل پشتیبان برای Restore'],
-    'فعال‌سازی':['فعال‌سازی','وضعیت: Trial فعال<br>نسخه: GameNet UI Preview 1.0'],
-    'بروزرسانی':['بروزرسانی','نسخه نصب: 1.0.0<br>نسخه پیشنهادی: 1.1.0']
-  };
-  var x=info[name]||[name,'این بخش اکنون سطح مستقل دارد.'];
-  toolbarModal(x[0],'<div class="detail-alert">'+x[1]+'</div><div class="actions"><button onclick="toolbarClose()">بستن</button><button class="primary" onclick="toolbarFeatureAction(\\''+name+'\\')">اجرای عملیات</button></div>',620)
-}
-function toolbarFeatureAction(name){
-  if(name==='پشتیبان'){
-    var blob=new Blob([JSON.stringify({version:1,createdAt:new Date().toISOString(),customers:previewCustomers},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download='gamenet-preview-backup.json';a.click();URL.revokeObjectURL(url);showToast('پشتیبان JSON ساخته شد');return
-  }
-  if(name==='تنظیمات'){localStorage.setItem('gamenet_settings_opened','1');showToast('تنظیمات Preview ذخیره شد');return}
-  showToast('عملیات '+name+' برای اتصال به Backend آماده شد')
-}
-function showPage(title){document.getElementById('title').textContent=title}
-function toolAction(name){
-  if(name==='مشتریان'){openCustomerManager();return}
-  if(name==='ادمین‌ها'){openStaffManager();return}
-  if(name==='تعرفه'){openTariff();return}
-  if(name==='شارژ'){openChargePanel();return}
-  if(name==='دستگاه جدید'){openNewDevicePanel();return}
-  openToolbarFeature(name)
-}
-\`;
-
-            let updated = source.replace(marker, replacement);
-            const firstClose = updated.indexOf('</html>');
-            if (firstClose >= 0) updated = updated.slice(0, firstClose + 7) + '\n';
-
-            await github.rest.repos.createOrUpdateFileContents({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              path,
-              message: 'feat(ui): complete GameNet toolbar interactions',
-              content: Buffer.from(updated, 'utf8').toString('base64'),
-              sha: (await github.rest.repos.getContent({owner: context.repo.owner, repo: context.repo.repo, path})).data.sha,
-              branch: 'main'
-            });
-
   deploy:
-    needs: patch-toolbar
-    if: always()
     environment:
       name: github-pages
-      url: \${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: "."
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
