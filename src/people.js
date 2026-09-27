@@ -20,7 +20,7 @@ function createPreviewCustomer(){
   if(previewCustomers.some(function(x){return x.id===id})){showToast('این شناسه قبلاً استفاده شده است');return}
   if(previewCustomers.some(function(x){return String(x.username||'').toLowerCase()===username.toLowerCase()})){showToast('این نام کاربری قبلاً استفاده شده است');return}
   const cc={id:id,name:name,username:username,pin:pin,phone:phone,balance:balance,freeCredit:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'—',lastVisit:'همین حالا',maxConcurrent:1,sharedTimePool:true,activeSessions:[]};
-  previewCustomers.unshift(cc);profileMap[cc.name]={name:cc.name,code:cc.id,phone:cc.phone,balance:cc.balance.toLocaleString()+' تومان',vip:'ندارد',unit:'—',session:'—'};recordCustomerEvent({customerId:cc.id,type:'customer-create',label:'ساخت مشتری'});persistAppState('customer-create');showToast('مشتری ساخته شد: #'+cc.id+' • '+cc.username);openCustomerManager();
+  previewCustomers.unshift(cc);recordCustomerEvent({customerId:cc.id,type:'customer-create',label:'ساخت مشتری'});persistAppState('customer-create');showToast('مشتری ساخته شد: #'+cc.id+' • '+cc.username);openCustomerManager();
 }
 
 function openCustomerRecordPreview(id){const x=previewCustomers.find(v=>v.id===id);if(!x)return;const resource={id:x.unit==='—'?'CUSTOMER'+x.id:x.unit,type:'pc',state:x.unit==='—'?'Idle':'Active',customer:x.name,session:x.unit==='—'?'—':'Session',remaining:'—',amount:x.balance.toLocaleString()};openProfile(resource)}
