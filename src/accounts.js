@@ -123,7 +123,7 @@ function saveCustomerEdit(id){
   if(!nu){showToast('نام کاربری الزامی است');return}
   if(previewCustomers.some(function(v){return v.id!==id&&String(v.username||'').toLowerCase()===nu.toLowerCase()})){showToast('این نام کاربری قبلاً استفاده شده است');return}
   cc.name=String(document.getElementById('editCName')?.value||cc.name).trim();cc.username=nu;cc.phone=String(document.getElementById('editCPhone')?.value||cc.phone).trim();cc.pin=String(document.getElementById('editCPin')?.value||cc.pin).trim();
-  profileMap[cc.name]={name:cc.name,code:cc.id,phone:cc.phone,balance:Number(cc.balance||0).toLocaleString()+' تومان',vip:cc.vipActive?(cc.vip||'VIP'):'ندارد',unit:cc.activeSessions?.[0]?.deviceId||'—',session:'—'};window._profileResource.customer=cc.name;persistAppState('customer-edit');openProfile(window._profileResource);
+window._profileResource.customer=cc.name;persistAppState('customer-edit');openProfile(window._profileResource);
 }
 function openCustomerHistory(x){
   const cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.name===x?.customer});if(!cc)return;
