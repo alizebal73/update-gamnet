@@ -19,11 +19,11 @@ function openHotkeyCustomerSearch(){
 function findHotkeyCustomer(){
   const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');
   if(!c){showToast('مشتری با این شناسه پیدا نشد');return}
-  toolbarClose();
   window._hotkeyCustomer=c;
   window._profileResource=hotkeyResourceFromCustomer(c);
-  openProfile(window._profileResource);
-  showToast('مشتری '+c.id+' پیدا شد')
+  const detail=document.getElementById('detail');
+  if(detail)detail.innerHTML='';
+  setTimeout(function(){openProfile(window._profileResource);showToast('مشتری '+c.id+' پیدا شد')},0)
 }
 
 
