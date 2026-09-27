@@ -240,7 +240,6 @@ render();
 }
 function setTariff(t){tariffType=t;openTariff()}
 function updateTariff(){const rate=document.getElementById('rate')?.value||tariffRates[tariffType],amount=document.getElementById('amount')?.value||0;const el=document.getElementById('calcTime');if(el)el.textContent=formatRateTime(rate,amount)}
-function toolAction(name){if(name==='تعرفه'){openTariff();return}const map={'مشتریان':'Customers','شارژ':'Commercial / Wallet','دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','ادمین‌ها':'Branches & Staff','تنظیمات':'Settings','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'};showPage(map[name]||name)}
 function manualTick(){[...ps,...fs].forEach(x=>{if(typeof x.remainingSeconds==='number'&&x.remainingSeconds>0){x.remainingSeconds--;const t=Math.max(0,x.remainingSeconds),m=Math.floor(t/60),sec=t%60;x.remaining=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');x.timeWarning=t<=600;x.timeUp=t<=0;x.notice=x.timeUp?'TIME UP':x.timeWarning?'Ending soon':'Running';x.timerLabel=x.timeUp?'00:00':Math.ceil(t/60)+' min';if(x.timeUp)x.state='Time Up';} });render()}
 setInterval(manualTick,1000)
 document.getElementById('events').innerHTML='<div class="event"><time>12:08</time><div><b>Session started</b><small>PC11 • 60 min package</small></div></div><div class="event"><time>12:04</time><div><b>Payment received</b><small>420,000 تومان • نقدی</small></div></div><div class="event"><time>11:58</time><div><b>PC04 paused</b><small>Network heartbeat recovered</small></div></div><div class="event"><time>11:46</time><div><b>New customer</b><small>Customer #1040 created</small></div></div>';
@@ -418,23 +417,6 @@ function saveHotkeySettings(){
     previewCustomers.push({id:'1010',name:'مشتری 1010',username:'customer1010',phone:'0912***10',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'—',lastVisit:'Today',freeCredit:0,maxConcurrent:1,sharedTimePool:true,activeConnections:0})
   }
 })
-function toolAction(name){
-  if(name==='مشتریان'){openHotkeyCustomerSearch();return}
-  if(name==='ادمین‌ها'){openStaffManager();return}
-  if(name==='تعرفه'){openTariff();return}
-  if(name==='شارژ'){openHotkeyCharge();return}
-  if(name==='تنظیمات'){openHotkeySettings();return}
-  showPage(({'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))
-}
-{
-  if(name==='مشتریان'){openHotkeyCustomerSearch();return}
-  if(name==='ادمین‌ها'){openStaffManager();return}
-  if(name==='تعرفه'){openTariff();return}
-  if(name==='شارژ'){openHotkeyCharge();return}
-  if(name==='تنظیمات'){openHotkeySettings();return}
-  showPage(({ 'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))
-}
-
 </script>
 </body>
 </html>
