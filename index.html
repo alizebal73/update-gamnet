@@ -83,9 +83,8 @@ function confirmAccountAction(action,id){
   else if(action==='discount'){const base=Math.max(0,Number(document.getElementById('paymentBase')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('discountPercent')?.value||0))),bonus=Math.round(base*pct/100);live.balance+=base;live.freeCredit+=bonus;addPayment(live,base,'نقدی / کارت','پرداخت + '+pct+'٪ هدیه');persistAppState('discount');showToast('پرداخت '+base.toLocaleString()+' تومان + '+bonus.toLocaleString()+' تومان رایگان ثبت شد')}
   openProfile({id:'CUSTOMER'+live.id,customer:live.name,customerId:live.id,type:'pc',state:'Idle',session:'—'});
 }
-
+ 
 function updateDiscountPreview(){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),d=Math.round(base*pct/100),total=base+d,rate=getCustomerEffectiveRate(window._profileResource||{});if(document.getElementById('paidAmount'))document.getElementById('paidAmount').textContent=base.toLocaleString()+' تومان';if(document.getElementById('discountAmount'))document.getElementById('discountAmount').textContent=d.toLocaleString()+' تومان';if(document.getElementById('totalValue'))document.getElementById('totalValue').textContent=total.toLocaleString()+' تومان';if(document.getElementById('paidTime'))document.getElementById('paidTime').textContent=formatDiscountBaseTime(base,rate);if(document.getElementById('freeTime'))document.getElementById('freeTime').textContent=discountFreeTime(base,pct,rate);if(document.getElementById('totalTime'))document.getElementById('totalTime').textContent=formatDiscountTotalTime(base,pct,rate)}
-function openProfile
 function openProfile(x){
   const p=profileFor(x);if(!p){showToast('پروفایل مشتری پیدا نشد');return}
   window._profileResource=x;
