@@ -47,7 +47,7 @@ function inlineAccountAction(action){
   const live=previewCustomers.find(function(cc){return cc.id===resource.customerId||cc.id===resource.customer||cc.name===resource.customer});
   if(!live){showToast('ابتدا مشتری را انتخاب کن');return}
   const panel=document.getElementById('inlineAccountOperation');
-  if(!panel){showAccountAction(action,resource);return}
+  if(!panel){openProfile(resource);const fresh=document.getElementById('inlineAccountOperation');if(fresh){renderInlineAccountOperation(action,live)}return}
   const amount=Number(document.getElementById('inlineAccountAmount')?.value||0);
   const same=panel.dataset.action===action;
   if(panel.hidden||!same){renderInlineAccountOperation(action,live);return}
@@ -65,7 +65,7 @@ function renderInlineAccountOperation(action,live){
     panel.innerHTML='<div class="inline-account-head"><div><strong>خرید / تمدید VIP</strong><small>برای VIP تنظیمات پلن لازم است.</small></div><button type="button" class="ghost" onclick="closeInlineAccountOperation()">×</button></div><div class="inline-vip-row"><span>پلن VIP را از کارت VIP انتخاب کن</span><button class="primary" onclick="openVipDialog(window._profileResource)">انتخاب پلن</button></div>';
     return;
   }
-  const def=action==='pay-debt'?Math.min(50000,Number(live.debt||0)):50000;
+  const def='';
   if(action==='discount'){
     panel.hidden=false;panel.dataset.action=action;
     panel.innerHTML='<div class="inline-account-head"><div><strong>'+labels[action]+'</strong><small>مبلغ پرداختی واقعی + درصد هدیه</small></div><button type="button" class="ghost" onclick="closeInlineAccountOperation()">×</button></div><div class="inline-operation-fields"><label>مبلغ پرداختی<input id="inlineAccountAmount" type="number" min="0" step="1000" value="'+def+'" oninput="updateInlineDiscountPreview()"></label><label>هدیه %<select id="inlineDiscountPercent" class="operation-select" onchange="updateInlineDiscountPreview()">'+[0,10,20,30,40,50,60,70,80,90,100].map(function(n){return '<option value="'+n+'" '+(n===10?'selected':'')+'>'+n+'٪</option>'}).join('')+'</select></label><div class="inline-operation-preview" id="inlineDiscountSummary"></div></div><div class="inline-operation-hint">Enter یا هات‌کی عملیات را ثبت می‌کند؛ کلیک روی هر کارت هم با همین مبلغ اجرا می‌شود.</div>';
