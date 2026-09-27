@@ -39,7 +39,7 @@ function renderAccountOperationButtons(cc){
   return '<div class="account-operations-block"><div class="account-section-title"><div><div class="eyebrow">Quick account actions</div><h3>عملیات حساب</h3></div><span>مبلغ را پایین وارد کن؛ سپس کارت یا هات‌کی عملیات را اجرا کن.</span></div><div class="account-quick-actions">'+ops.map(function(o){
     const shortcut=hk[o[3]]||'';
     return '<button type="button" class="account-op-button" onclick="inlineAccountAction(\''+o[0]+'\')"><span class="account-op-icon">'+o[2]+'</span><span class="account-op-label">'+o[1]+'</span>'+(shortcut?'<span class="account-op-hotkey">'+escapeHtml(shortcut)+'</span>':'')+'</button>';
-  }).join('')+'</div><div class="inline-account-operation" id="inlineAccountOperation"><div class="inline-account-head"><div><strong id="inlineOperationTitle">مبلغ عملیات</strong><small id="inlineOperationHint">ابتدا مبلغ را وارد کن؛ بعد عملیات موردنظر را بزن.</small></div><span id="inlineSelectedHotkey" class="rate-badge">آماده</span></div><div class="inline-operation-fields"><label>مبلغ (تومان)<input id="inlineAccountAmount" type="number" min="0" step="1000" placeholder="مثلاً 100000"></label><div class="inline-operation-preview" id="inlineOperationPreview"><span>وضعیت حساب</span><strong>اعتبار '+Number(cc?.balance||0).toLocaleString()+' • رایگان '+Number(cc?.freeCredit||0).toLocaleString()+' • بدهی '+Number(cc?.debt||0).toLocaleString()+'</strong></div></div><div class="inline-operation-extra" id="inlineDiscountExtra" hidden><label>درصد هدیه<select id="inlineDiscountPercent" class="operation-select" onchange="updateInlineDiscountPreview()">'+[0,10,20,30,40,50,60,70,80,90,100].map(function(n){return '<option value="'+n+'" '+(n===10?'selected':'')+'>'+n+'٪</option>'}).join('')+'</select></label><div class="inline-operation-preview" id="inlineDiscountSummary"></div></div></div></div>';
+  }).join('')+'</div><div class="inline-account-operation" id="inlineAccountOperation"><div class="inline-account-head"><div><strong id="inlineOperationTitle">مبلغ عملیات</strong><small id="inlineOperationHint">ابتدا مبلغ را وارد کن؛ بعد عملیات موردنظر را بزن.</small></div><span id="inlineSelectedHotkey" class="rate-badge">آماده</span></div><div class="inline-operation-fields"><label>مبلغ (تومان)<input id="inlineAccountAmount" type="number" min="0" step="1000" placeholder="مثلاً 100000" oninput="updateInlineOperationPreview()"></label><div class="inline-operation-preview" id="inlineOperationPreview"><span>وضعیت حساب</span><strong>اعتبار '+Number(cc?.balance||0).toLocaleString()+' • رایگان '+Number(cc?.freeCredit||0).toLocaleString()+' • بدهی '+Number(cc?.debt||0).toLocaleString()+'</strong></div></div><div class="inline-operation-extra" id="inlineDiscountExtra" hidden><label>درصد هدیه<select id="inlineDiscountPercent" class="operation-select" onchange="updateInlineDiscountPreview()">'+[0,10,20,30,40,50,60,70,80,90,100].map(function(n){return '<option value="'+n+'" '+(n===10?'selected':'')+'>'+n+'٪</option>'}).join('')+'</select></label><div class="inline-operation-preview" id="inlineDiscountSummary"></div></div></div></div>';
 }
 
 function inlineAccountAction(action){
@@ -52,10 +52,11 @@ function inlineAccountAction(action){
   const labels={charge:'شارژ اعتبار',deduct:'کسر اعتبار',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',free:'اعتبار رایگان',discount:'پرداخت + هدیه',vip:'خرید / تمدید VIP'};
   const title=document.getElementById('inlineOperationTitle'),hint=document.getElementById('inlineOperationHint'),badge=document.getElementById('inlineSelectedHotkey'),extra=document.getElementById('inlineDiscountExtra');
   if(title)title.textContent=labels[action]||'مبلغ عملیات';
-  if(hint)hint.textContent=action==='vip'?'VIP از پلن و مدت انتخاب می‌شود.':(action==='discount'?'مبلغ پرداختی را وارد کن و درصد هدیه را انتخاب کن.':'مبلغ را وارد کن و همین کارت یا هات‌کی را بزن.');
+  if(hint)hint.textContent=action==='vip'?'VIP از پلن، مدت و سهمیه روزانه انتخاب می‌شود.':(action==='discount'?'مبلغ پرداختی را وارد کن و درصد هدیه را انتخاب کن.':(action==='pay-debt'?'مبلغ ابتدا بدهی را تسویه می‌کند؛ اگر اضافه بماند به اعتبار/وقت تبدیل می‌شود.':'مبلغ را وارد کن و همین کارت یا هات‌کی را بزن.'));
   if(badge)badge.textContent=action==='vip'?'VIP':(hk[{charge:'chargeCustomer',deduct:'deductCustomer',debt:'debtCustomer','pay-debt':'payDebtCustomer',free:'freeCustomer',discount:'discountCustomer'}[action]]||'آماده');
   if(extra)extra.hidden=action!=='discount';
   if(action==='discount')updateInlineDiscountPreview();
+  updateInlineOperationPreview();
   const amount=Number(input.value||0);
   if(action==='vip'){openVipDialog(resource);return}
   if(amount>0)executeInlineAccountOperation(action,live);
@@ -80,6 +81,17 @@ function executeInlineAccountOperation(action,liveArg){
   return true;
 }
 
+function updateInlineOperationPreview(){
+  const panel=document.getElementById('inlineAccountOperation'),input=document.getElementById('inlineAccountAmount'),el=document.getElementById('inlineOperationPreview');
+  if(!panel||!input||!el)return;
+  const action=panel.dataset.action||'charge',amount=Math.max(0,Number(input.value||0)),x=window._profileResource||{},cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.id===x?.customer||v.name===x?.customer}),debt=Number(cc?.debt||0),rate=getCustomerEffectiveRate(x);
+  if(action==='pay-debt'){
+    const pay=Math.min(amount,debt),rem=Math.max(0,amount-pay),extraTime=rate>0?Math.floor(rem/rate*3600):0;
+    el.innerHTML='<span>پرداخت بدهی</span><strong>'+pay.toLocaleString()+' تومان از بدهی کم می‌شود'+(rem>0?' • '+rem.toLocaleString()+' تومان اعتبار می‌شود • حدود '+formatSharedTime(extraTime)+' وقت اضافه':' • مانده‌ای برای اعتبار/وقت باقی نمی‌ماند')+'</strong>';
+    return;
+  }
+  el.innerHTML='<span>وضعیت حساب</span><strong>اعتبار '+Number(cc?.balance||0).toLocaleString()+' • رایگان '+Number(cc?.freeCredit||0).toLocaleString()+' • بدهی '+debt.toLocaleString()+'</strong>';
+}
 function closeInlineAccountOperation(){}
 
 

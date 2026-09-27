@@ -156,7 +156,11 @@ function loadScripts(context) {
       saveDeviceSettings,
       commitAccountOperation,
       openProfile,
-      window
+      window,
+      vipPlans,
+      openVipPlanSettings,
+      saveVipPlanSettings,
+      openVipDialog
     };
   `);
   bridge.runInContext(ctx);
@@ -219,6 +223,14 @@ function runtimeFlowChecks(ctx) {
   ui.executeInlineAccountOperation('charge', created);
   assert(Number(created.balance) === beforeCharge + 10000, 'Charge operation did not update balance');
 
+  const debtBeforeBalance = Number(created.balance || 0);
+  created.debt = 40000;
+  get('inlineAccountAmount').value = '50000';
+  ui.window._profileResource = { id: 'CUSTOMER' + created.id, customer: created.name, customerId: created.id, type: 'pc', state: 'Idle', session: '—' };
+  ui.executeInlineAccountOperation('pay-debt', created);
+  assert(Number(created.debt) === 0, 'Debt payment did not clear the debt first');
+  assert(Number(created.balance) === debtBeforeBalance + 10000, 'Debt payment remainder was not added to customer credit/time');
+
   const beforeFree = Number(created.freeCredit || 0);
   get('inlineAccountAmount').value = '10000';
   get('inlineDiscountPercent').value = '10';
@@ -236,6 +248,23 @@ function runtimeFlowChecks(ctx) {
   assert(ui.getDeviceTariff('PC01') === 'vip', 'Device VIP setting was not saved');
   assert(get('detail').innerHTML.includes('دستگاه‌ها و کلاس تعرفه'), 'Device save did not return to device manager');
   assert(ui.getDeviceRate('PC01') === 100000, 'VIP PC tariff derivation is wrong');
+
+  assert(Array.isArray(ui.vipPlans) && ui.vipPlans.length === 3, 'VIP plans are missing');
+  const silver = ui.vipPlans.find((p) => p.key === 'silver');
+  const platinum = ui.vipPlans.find((p) => p.key === 'platinum');
+  assert(silver && Number(silver.dailyHours) === 2, 'Silver daily VIP quota is wrong');
+  assert(platinum && Number(platinum.dailyHours) === 24, 'Platinum daily VIP quota is wrong');
+  ui.openVipPlanSettings();
+  get('vipPlanLabel_silver').value = 'Silver Daily';
+  get('vipPlanPrice_silver').value = '1900000';
+  get('vipPlanMonths_silver').value = '1';
+  get('vipPlanHours_silver').value = '3';
+  get('vipPlanNote_silver').value = 'روزانه ۳ ساعت';
+  ui.saveVipPlanSettings();
+  assert(Number(silver.dailyHours) === 3, 'VIP plan settings did not save daily hours');
+  assert(Number(silver.price) === 1900000, 'VIP plan settings did not save price');
+  ui.openVipDialog(ui.window._profileResource);
+  assert(get('detail').innerHTML.includes('3 ساعت'), 'VIP dialog did not show configured daily quota');
 
   assert(typeof ui.commitAccountOperation === 'function', 'Financial operation engine missing');
   assert(typeof ui.openProfile === 'function', 'Profile renderer missing');
