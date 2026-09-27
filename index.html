@@ -240,49 +240,65 @@ document.getElementById('events').innerHTML='<div class="event"><time>12:08</tim
 render();
 
 /* GameNet operator hotkeys: configurable F-keys + fast customer charge workflow */
-const defaultGameNetHotkeys={openCustomer:'F1',chargeCustomer:'F4',confirmCharge:'F7'};
+const defaultGameNetHotkeys={
+  openCustomer:'F1',
+  chargeCustomer:'F4',
+  deductCustomer:'F6',
+  debtCustomer:'F5',
+  freeCustomer:'F8',
+  payDebtCustomer:'F9',
+  discountCustomer:'F10',
+  confirmAction:'Enter'
+};
+const gameNetHotkeyLabels={
+  openCustomer:'بازکردن پروفایل مشتری',
+  chargeCustomer:'شارژ اعتبار',
+  deductCustomer:'کسر اعتبار',
+  debtCustomer:'ثبت بدهی',
+  freeCustomer:'اعتبار رایگان',
+  payDebtCustomer:'پرداخت بدهی',
+  discountCustomer:'پرداخت + هدیه زمانی',
+  confirmAction:'ثبت / تأیید عملیات'
+};
+const gameNetHotkeyOrder=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer','confirmAction'];
 function getGameNetHotkeys(){
   try{return Object.assign({},defaultGameNetHotkeys,JSON.parse(localStorage.getItem('gamenet_hotkeys')||'{}'))}
   catch(e){return Object.assign({},defaultGameNetHotkeys)}
 }
-function saveGameNetHotkeys(next){
-  localStorage.setItem('gamenet_hotkeys',JSON.stringify(next));
-}
+function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next))}
 function hotkeyResourceFromCustomer(c){
-  return {
-    id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,
-    type:'pc',
-    state:c.unit&&c.unit!=='—'?'Active':'Idle',
-    customer:c.name,
-    session:c.unit&&c.unit!=='—'?'Session':'—',
-    remaining:'—',
-    amount:toolbarMoney(c.balance||0),
-    remainingValue:0,
-    freeCredit:Number(c.freeCredit||0),
-    debt:Number(c.debt||0)
-  };
-}
-function syncLiveCustomerOnProfile(c){
-  const live=previewCustomers.find(x=>x.id===c.id);
-  if(!live)return;
-  const r=hotkeyResourceFromCustomer(live);
-  r.maxConcurrent=c.maxConcurrent||1;
-  r.sharedTimePool=c.sharedTimePool!==false;
-  window._profileResource=r;
+  return {id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,type:'pc',state:c.unit&&c.unit!=='—'?'Active':'Idle',customer:c.name,customerId:c.id,session:c.unit&&c.unit!=='—'?'Session':'—',remaining:'—',amount:toolbarMoney(c.balance||0),remainingValue:0,freeCredit:Number(c.freeCredit||0),debt:Number(c.debt||0)}
 }
 function findPreviewCustomer(query){
   const q=String(query||'').trim().toLowerCase();
-  return previewCustomers.find(c=>[
-    c.id,c.username,c.name,c.phone
-  ].some(v=>String(v||'').toLowerCase()===q || String(v||'').toLowerCase().includes(q)));
+  return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q||String(v||'').toLowerCase().includes(q)))
+}
+function getActiveHotkeyCustomer(){
+  if(window._hotkeyCustomer){
+    const c=previewCustomers.find(x=>x.id===window._hotkeyCustomer.id);
+    if(c)return c;
+  }
+  if(window._profileResource?.customer){
+    const c=findPreviewCustomer(window._profileResource.customer);
+    if(c)return c;
+  }
+  return null
+}
+function hotkeyAfterProfile(c){
+  const resource=hotkeyResourceFromCustomer(c);
+  window._hotkeyCustomer=c;
+  window._profileResource=resource;
+  openProfile(resource);
+  const pending=window._pendingHotkeyAction;
+  window._pendingHotkeyAction=null;
+  if(pending&&pending!=='openCustomer')setTimeout(function(){openHotkeyAccountAction(pending)},50)
 }
 function openHotkeyCustomerSearch(){
-  const hk=getGameNetHotkeys();
   toolbarModal('بازکردن پروفایل مشتری',
     '<div class="detail-alert">کد مشتری، نام کاربری یا نام را وارد کن و Enter بزن.</div>'+
     '<label style="display:block;margin-top:10px;font-size:8px;color:#66758a">شناسه مشتری</label>'+
-    '<input id="hotkeyCustomerInput" autocomplete="off" autofocus placeholder="مثلاً 1010" style="width:100%;height:38px;margin-top:4px;border:1px solid #cfd9e7;border-radius:6px;padding:0 10px;font-size:11px">'+
-    '<div style="margin-top:8px;font-size:7.5px;color:#8995a6">میانبر فعلی: '+hk.openCustomer+' • پس از انتخاب، '+hk.chargeCustomer+' برای شارژ اعتبار</div>'+
+    '<input id="hotkeyCustomerInput" autocomplete="off" placeholder="مثلاً 1010" style="width:100%;height:38px;margin-top:4px;border:1px solid #cfd9e7;border-radius:6px;padding:0 10px;font-size:11px">'+
+    '<div style="margin-top:8px;font-size:7.5px;color:#8995a6">میانبرهای عملیات از تنظیمات قابل تغییر هستند.</div>'+
     '<div class="actions"><button onclick="toolbarClose()">بستن</button><button class="primary" onclick="findHotkeyCustomer()">Enter / بازکردن</button></div>',520);
   setTimeout(function(){
     const input=document.getElementById('hotkeyCustomerInput');
@@ -290,101 +306,103 @@ function openHotkeyCustomerSearch(){
   },30)
 }
 function findHotkeyCustomer(){
-  const q=document.getElementById('hotkeyCustomerInput')?.value||'';
-  const c=findPreviewCustomer(q);
+  const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');
   if(!c){showToast('مشتری با این شناسه پیدا نشد');return}
   toolbarClose();
-  window._hotkeyCustomer=c;
-  const resource=hotkeyResourceFromCustomer(c);
-  window._profileResource=resource;
-  openProfile(resource);
-  showToast('پروفایل '+c.id+' باز شد • '+getGameNetHotkeys().chargeCustomer+' برای شارژ اعتبار')
+  hotkeyAfterProfile(c);
+  showToast('پروفایل '+c.id+' باز شد')
 }
 function openHotkeyCharge(){
-  let c=window._hotkeyCustomer;
-  if(!c && window._profileResource?.customer){
-    c=findPreviewCustomer(window._profileResource.customer);
-  }
-  if(!c){openHotkeyCustomerSearch();return}
+  const c=getActiveHotkeyCustomer();
+  if(!c){window._pendingHotkeyAction='chargeCustomer';openHotkeyCustomerSearch();return}
   window._hotkeyCustomer=c;
   const hk=getGameNetHotkeys();
   toolbarModal('شارژ سریع اعتبار',
-    '<div class="grid2">'+
-    '<div><small>مشتری</small><b style="display:block;margin-top:4px">#'+c.id+' • '+c.name+'</b></div>'+
+    '<div class="grid2"><div><small>مشتری</small><b style="display:block;margin-top:4px">#'+c.id+' • '+c.name+'</b></div>'+
     '<div><small>اعتبار فعلی</small><b style="display:block;margin-top:4px">'+toolbarMoney(c.balance||0)+'</b></div>'+
     '<div><small>مبلغ شارژ (تومان)</small><input id="hotkeyChargeAmount" type="number" min="0" step="1000" value="100000" style="width:100%;height:34px;font-size:11px"></div>'+
-    '<div><small>درصد هدیه (اختیاری)</small><input id="hotkeyChargeBonus" type="number" min="0" max="100" step="1" value="0" style="width:100%;height:34px;font-size:11px"></div>'+
-    '</div>'+
-    '<div class="discount-summary" style="margin-top:10px">'+
-    '<div><span>پرداختی مشتری</span><strong id="hkPaid">100,000 تومان</strong></div>'+
-    '<div><span>اعتبار رایگان</span><strong id="hkFree">0 تومان</strong></div>'+
-    '<div><span>اعتبار اضافه‌شده</span><strong id="hkTotal">100,000 تومان</strong></div>'+
-    '</div>'+
-    '<div class="detail-alert" style="margin-top:10px">'+hk.chargeCustomer+' = بازکردن این پنجره • Enter یا '+hk.confirmCharge+' = ثبت شارژ</div>'+
-    '<div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="submitHotkeyCharge()">ثبت شارژ ('+hk.confirmCharge+')</button></div>',560);
+    '<div><small>درصد هدیه (اختیاری)</small><input id="hotkeyChargeBonus" type="number" min="0" max="100" step="1" value="0" style="width:100%;height:34px;font-size:11px"></div></div>'+
+    '<div class="discount-summary" style="margin-top:10px"><div><span>پرداختی مشتری</span><strong id="hkPaid">100,000 تومان</strong></div><div><span>اعتبار رایگان</span><strong id="hkFree">0 تومان</strong></div><div><span>اعتبار اضافه‌شده</span><strong id="hkTotal">100,000 تومان</strong></div></div>'+
+    '<div class="detail-alert" style="margin-top:10px">Enter = ثبت مستقیم. میانبر شارژ: '+hk.chargeCustomer+'</div>'+
+    '<div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="submitHotkeyCharge()">ثبت شارژ</button></div>',560);
   setTimeout(function(){
     const amount=document.getElementById('hotkeyChargeAmount'),bonus=document.getElementById('hotkeyChargeBonus');
     if(amount){
       amount.focus();amount.select();
-      const update=function(){
-        const paid=Number(amount.value||0),pct=Math.max(0,Math.min(100,Number(bonus?.value||0))),free=Math.round(paid*pct/100),total=paid+free;
-        if(document.getElementById('hkPaid'))document.getElementById('hkPaid').textContent=toolbarMoney(paid);
-        if(document.getElementById('hkFree'))document.getElementById('hkFree').textContent=toolbarMoney(free);
-        if(document.getElementById('hkTotal'))document.getElementById('hkTotal').textContent=toolbarMoney(total);
-      };
-      amount.addEventListener('input',update);
-      if(bonus)bonus.addEventListener('input',update);
-      amount.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();submitHotkeyCharge()}});
-      if(bonus)bonus.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();submitHotkeyCharge()}});
+      const update=function(){const paid=Number(amount.value||0),pct=Math.max(0,Math.min(100,Number(bonus?.value||0))),free=Math.round(paid*pct/100),total=paid+free;if(document.getElementById('hkPaid'))document.getElementById('hkPaid').textContent=toolbarMoney(paid);if(document.getElementById('hkFree'))document.getElementById('hkFree').textContent=toolbarMoney(free);if(document.getElementById('hkTotal'))document.getElementById('hkTotal').textContent=toolbarMoney(total)};
+      amount.addEventListener('input',update);if(bonus)bonus.addEventListener('input',update);
     }
   },30)
 }
 function submitHotkeyCharge(){
-  const c=window._hotkeyCustomer;
+  const c=getActiveHotkeyCustomer();
   if(!c){showToast('ابتدا مشتری را انتخاب کن');return}
-  const paid=Math.max(0,Number(document.getElementById('hotkeyChargeAmount')?.value||0));
-  const pct=Math.max(0,Math.min(100,Number(document.getElementById('hotkeyChargeBonus')?.value||0)));
+  const paid=Math.max(0,Number(document.getElementById('hotkeyChargeAmount')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('hotkeyChargeBonus')?.value||0)));
   if(paid<=0){showToast('مبلغ شارژ باید بیشتر از صفر باشد');return}
   const free=Math.round(paid*pct/100);
-  c.balance=Number(c.balance||0)+paid;
-  c.freeCredit=Number(c.freeCredit||0)+free;
-  window._hotkeyCustomer=c;
-  window._profileResource=hotkeyResourceFromCustomer(c);
-  toolbarClose();
-  openProfile(window._profileResource);
+  c.balance=Number(c.balance||0)+paid;c.freeCredit=Number(c.freeCredit||0)+free;
+  window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);
+  toolbarClose();openProfile(window._profileResource);
   showToast('#'+c.id+' شارژ شد • پرداختی '+toolbarMoney(paid)+' • رایگان '+toolbarMoney(free)+' • اعتبار جدید '+toolbarMoney(c.balance))
 }
+function openHotkeyAccountAction(action){
+  const c=getActiveHotkeyCustomer();
+  if(!c){window._pendingHotkeyAction=action;openHotkeyCustomerSearch();return}
+  window._hotkeyCustomer=c;
+  const resource=hotkeyResourceFromCustomer(c);
+  window._profileResource=resource;
+  openProfile(resource);
+  setTimeout(function(){showAccountAction(action,resource)},40)
+}
+function confirmActiveHotkeyOperation(){
+  if(document.getElementById('hotkeyChargeAmount')){submitHotkeyCharge();return true}
+  const detail=document.getElementById('detail');
+  const primary=detail?.querySelector('.operation-footer .primary');
+  if(primary){primary.click();return true}
+  return false
+}
 function openHotkeySettings(){
-  const hk=getGameNetHotkeys(), options=['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
-  const select=function(id,value){return '<select id="'+id+'" style="width:100%;height:32px">'+options.map(function(k){return '<option value="'+k+'" '+(k===value?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};
+  const hk=getGameNetHotkeys(), options=['Enter','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'], actionKeys=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer'];
+  const select=function(id,value,allowEnter){const list=allowEnter?options:options.filter(x=>x!=='Enter');return '<select id="'+id+'" style="width:100%;height:32px">'+list.map(function(k){return '<option value="'+k+'" '+(k===value?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};
+  const rows=actionKeys.map(function(k){return '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels[k]+'</strong><small>میانبر مستقل این عملیات</small></div><div></div>'+select('hk_'+k,hk[k],false)+'</div>'}).join('');
   toolbarModal('میانبرهای اپراتور',
-    '<div class="detail-alert">میانبرها را برای سرعت کار اپراتور تنظیم کن. Enter برای ورود مشتری و ثبت شارژ همیشه فعال می‌ماند.</div>'+
-    '<div class="account-list" style="margin-top:10px">'+
-    '<div class="account-row"><div class="account-row-label"><strong>بازکردن پروفایل مشتری</strong><small>پنجره جستجوی کد/نام مشتری</small></div><div></div>'+select('hkOpen',hk.openCustomer)+'</div>'+
-    '<div class="account-row"><div class="account-row-label"><strong>شارژ اعتبار</strong><small>وقتی پروفایل مشتری باز است</small></div><div></div>'+select('hkCharge',hk.chargeCustomer)+'</div>'+
-    '<div class="account-row"><div class="account-row-label"><strong>ثبت شارژ</strong><small>ثبت مبلغ واردشده</small></div><div></div>'+select('hkConfirm',hk.confirmCharge)+'</div>'+
-    '</div>'+
-    '<div class="detail-alert" style="margin-top:10px">پیشنهاد سریع: F1 = مشتری، F4 = شارژ، F7 = ثبت.</div>'+
-    '<div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveHotkeySettings()">ذخیره میانبرها</button></div>',620)
+    '<div class="detail-alert">برای هر عملیات یک کلید جدا انتخاب کن. مثال: F7 = شارژ، F6 = کسر اعتبار، F5 = ثبت بدهی. دکمه Enter برای تأیید عملیات است و جداگانه قابل تغییر است.</div>'+
+    '<div class="account-list" style="margin-top:10px">'+rows+
+    '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels.confirmAction+'</strong><small>ثبت مبلغ / تأیید پنجره عملیات</small></div><div></div>'+select('hk_confirm',hk.confirmAction,true)+'</div></div>'+
+    '<div class="actions"><button onclick="resetGameNetHotkeys()">بازگردانی پیش‌فرض</button><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveHotkeySettings()">ذخیره</button></div>',680)
+}
+function resetGameNetHotkeys(){
+  saveGameNetHotkeys(Object.assign({},defaultGameNetHotkeys));
+  showToast('میانبرهای پیش‌فرض بازگردانی شد');
+  openHotkeySettings()
 }
 function saveHotkeySettings(){
-  const next={openCustomer:document.getElementById('hkOpen').value,chargeCustomer:document.getElementById('hkCharge').value,confirmCharge:document.getElementById('hkConfirm').value};
-  if(new Set(Object.values(next)).size<3){showToast('هر سه میانبر باید متفاوت باشند');return}
-  saveGameNetHotkeys(next);
-  showToast('میانبرها ذخیره شدند');
-  toolbarClose()
+  const next={};
+  gameNetHotkeyOrder.forEach(function(k){
+    next[k]=document.getElementById('hk_'+k)?.value||defaultGameNetHotkeys[k]
+  });
+  const keys=gameNetHotkeyOrder.map(function(k){return next[k]}).filter(function(k){return k!=='Enter'});
+  if(new Set(keys).size!==keys.length){showToast('دو عملیات نمی‌توانند یک F-key مشترک داشته باشند');return}
+  if(next.confirmAction!=='Enter'&&keys.includes(next.confirmAction)){showToast('کلید ثبت/تأیید با یکی از عملیات مشترک است؛ یک F-key دیگر انتخاب کن یا Enter بگذار');return}
+  saveGameNetHotkeys(next);showToast('میانبرهای اپراتور ذخیره شدند');toolbarClose()
 }
 (function installGameNetOperatorHotkeys(){
   document.addEventListener('keydown',function(e){
     if(e.ctrlKey||e.altKey||e.metaKey)return;
-    const hk=getGameNetHotkeys();
-    const key=e.key;
+    const hk=getGameNetHotkeys(),key=e.key;
+    if(key==='Enter'&&document.getElementById('hotkeyCustomerInput'))return;
     if(key===hk.openCustomer){e.preventDefault();openHotkeyCustomerSearch();return}
     if(key===hk.chargeCustomer){e.preventDefault();openHotkeyCharge();return}
-    if(key===hk.confirmCharge){e.preventDefault();submitHotkeyCharge();return}
-    if(key==='Enter' && document.getElementById('hotkeyChargeAmount')){
+    if(key===hk.deductCustomer){e.preventDefault();openHotkeyAccountAction('deduct');return}
+    if(key===hk.debtCustomer){e.preventDefault();openHotkeyAccountAction('debt');return}
+    if(key===hk.freeCustomer){e.preventDefault();openHotkeyAccountAction('free');return}
+    if(key===hk.payDebtCustomer){e.preventDefault();openHotkeyAccountAction('pay-debt');return}
+    if(key===hk.discountCustomer){e.preventDefault();openHotkeyAccountAction('discount');return}
+    if(key===hk.confirmAction&&key!=='Enter'){e.preventDefault();confirmActiveHotkeyOperation();return}
+    if(key==='Enter'){
       const active=document.activeElement;
-      if(active?.id==='hotkeyChargeAmount'||active?.id==='hotkeyChargeBonus'){e.preventDefault();submitHotkeyCharge()}
+      if(active?.id==='hotkeyChargeAmount'||active?.id==='hotkeyChargeBonus'){e.preventDefault();submitHotkeyCharge();return}
+      if(confirmActiveHotkeyOperation()){e.preventDefault()}
     }
   });
 })();
@@ -392,8 +410,16 @@ function saveHotkeySettings(){
   if(!previewCustomers.some(function(c){return c.id==='1010'})){
     previewCustomers.push({id:'1010',name:'مشتری 1010',username:'customer1010',phone:'0912***10',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'—',lastVisit:'Today',freeCredit:0,maxConcurrent:1,sharedTimePool:true,activeConnections:0})
   }
-})();
+})
 function toolAction(name){
+  if(name==='مشتریان'){openHotkeyCustomerSearch();return}
+  if(name==='ادمین‌ها'){openStaffManager();return}
+  if(name==='تعرفه'){openTariff();return}
+  if(name==='شارژ'){openHotkeyCharge();return}
+  if(name==='تنظیمات'){openHotkeySettings();return}
+  showPage(({'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))
+}
+{
   if(name==='مشتریان'){openHotkeyCustomerSearch();return}
   if(name==='ادمین‌ها'){openStaffManager();return}
   if(name==='تعرفه'){openTariff();return}
