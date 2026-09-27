@@ -8,7 +8,16 @@ function getGameNetHotkeys(){try{return Object.assign({},defaultGameNetHotkeys,J
 function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next));if(typeof persistAppState==='function')persistAppState('hotkeys')}
 function toolbarMoney(n){return Number(n||0).toLocaleString('fa-IR')+' تومان'}
 function hotkeyResourceFromCustomer(c){return {id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,type:'pc',state:c.unit&&c.unit!=='—'?'Active':'Idle',customer:c.name,customerId:c.id,session:c.unit&&c.unit!=='—'?'Session':'—',remaining:'—',amount:toolbarMoney(c.balance||0),remainingValue:0,freeCredit:Number(c.freeCredit||0),debt:Number(c.debt||0)}}
-function findPreviewCustomer(query){const q=String(query||'').trim().toLowerCase();return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q))}
+function normalizeHotkeySearchValue(v){return String(v??'').trim().toLowerCase().replace(/[۰-۹]/g,function(ch){return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(ch))}).replace(/[٠-٩]/g,function(ch){return String('٠١٢٣٤٥٦٧٨٩'.indexOf(ch))})}
+function findPreviewCustomer(query){
+  const q=normalizeHotkeySearchValue(query);
+  if(!q)return null;
+  return previewCustomers.find(function(c){
+    return [c.id,c.username,c.name,c.phone].some(function(v){return normalizeHotkeySearchValue(v)===q})
+  })||previewCustomers.find(function(c){
+    return [c.username,c.name].some(function(v){return normalizeHotkeySearchValue(v).includes(q)})
+  })||null
+}
 function getActiveHotkeyCustomer(){if(window._hotkeyCustomer){const c=previewCustomers.find(x=>x.id===window._hotkeyCustomer.id);if(c)return c}if(window._profileResource?.customer)return findPreviewCustomer(window._profileResource.customer);return null}
 function openHotkeyCustomerSearch(){
   window._pendingHotkeyAction=null;
@@ -17,13 +26,19 @@ function openHotkeyCustomerSearch(){
 }
 
 function findHotkeyCustomer(){
-  const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');
-  if(!c){showToast('مشتری با این شناسه پیدا نشد');return}
+  const input=document.getElementById('hotkeyCustomerInput'),query=input?.value||'';
+  const c=findPreviewCustomer(query);
+  if(!c){showToast('مشتری با این شناسه، نام یا نام کاربری پیدا نشد');input?.focus();return}
+  const resource=hotkeyResourceFromCustomer(c);
   window._hotkeyCustomer=c;
-  window._profileResource=hotkeyResourceFromCustomer(c);
-  const detail=document.getElementById('detail');
-  if(detail)detail.innerHTML='';
-  setTimeout(function(){openProfile(window._profileResource);showToast('مشتری '+c.id+' پیدا شد')},0)
+  window._profileResource=resource;
+  try{
+    openProfile(resource);
+    showToast('مشتری '+c.id+' پیدا شد');
+  }catch(error){
+    console.error('GameNet profile open failed',error);
+    showToast('پروفایل باز نشد؛ خطای رابط کاربری ثبت شد');
+  }
 }
 
 
