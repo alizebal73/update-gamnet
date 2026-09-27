@@ -313,7 +313,7 @@ function runtimeFlowChecks(ctx) {
   assert(get('detail').innerHTML.includes('3 ساعت'), 'VIP dialog did not show configured daily quota');
   get('vipDays').value = '10';
   ui.updateVipPrice();
-  assert(get('vipPrice').value === '1266667', 'VIP custom day price did not scale from plan base');
+  assert(get('vipPrice').value === '1,266,667', 'VIP custom day price did not scale from plan base');
   assert(get('vipDurationText').textContent === '10 روز', 'VIP custom day duration was not applied');
 
   assert(typeof ui.commitAccountOperation === 'function', 'Financial operation engine missing');
