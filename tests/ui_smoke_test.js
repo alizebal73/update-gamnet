@@ -160,7 +160,13 @@ function loadScripts(context) {
       vipPlans,
       openVipPlanSettings,
       saveVipPlanSettings,
-      openVipDialog
+      openVipDialog,
+      openCustomerEdit,
+      saveCustomerEdit,
+      openHotkeyCustomerSearch,
+      startPreviewSession,
+      consumeSharedWallets,
+      getVipDailyRemainingSeconds
     };
   `);
   bridge.runInContext(ctx);
@@ -232,6 +238,43 @@ function runtimeFlowChecks(ctx) {
   assert(Number(created.balance) === debtBeforeBalance + 10000, 'Debt payment remainder was not added to customer credit/time');
 
   const beforeDiscountBalance = Number(created.balance || 0);
+  ui.openCustomerEdit({ customerId: newId, customer: created.name });
+  get('editCName').value = 'Edited Smoke Customer';
+  get('editCUser').value = 'smoke.edited';
+  get('editCPhone').value = '09120009999';
+  get('editCPin').value = '5678';
+  ui.saveCustomerEdit(newId);
+  assert(created.name === 'Edited Smoke Customer', 'Customer edit did not update name');
+  assert(created.username === 'smoke.edited', 'Customer edit did not update username');
+  assert(created.pin === '5678', 'Customer edit did not update PIN');
+
+  ui.openHotkeyCustomerSearch();
+  assert(get('detail').innerHTML.includes('compact-search-modal'), 'F1 search dialog did not use compact layout');
+
+  const vipCustomer = created;
+  vipCustomer.balance = 0;
+  vipCustomer.freeCredit = 0;
+  vipCustomer.vipActive = true;
+  vipCustomer.vipPlanKey = 'silver';
+  vipCustomer.vipExpiryTs = Date.now() + 86400000;
+  vipCustomer.vipDailyUsageKey = '';
+  vipCustomer.vipDailyUsedSeconds = 0;
+  const vipPlan = ui.vipPlans.find((p) => p.key === 'silver');
+  assert(vipPlan, 'Silver VIP plan is missing');
+  vipPlan.afterLimit = 'block';
+  assert(ui.getVipDailyRemainingSeconds(vipCustomer) > 0, 'VIP daily quota is not available');
+  assert(ui.startPreviewSession(newId, 'PC01') === true, 'VIP customer could not start a zero-balance session');
+  vipCustomer.vipDailyUsedSeconds = Number(vipPlan.dailyHours) * 3600;
+  ui.consumeSharedWallets();
+  assert(vipCustomer.activeSessions.length === 0, 'VIP daily limit did not stop the Session');
+  vipPlan.afterLimit = 'charge';
+  vipCustomer.balance = 20000;
+  vipCustomer.vipDailyUsedSeconds = Number(vipPlan.dailyHours) * 3600;
+  assert(ui.startPreviewSession(newId, 'PC01') === true, 'VIP charge-after-limit plan could not start with balance');
+  const beforeVipBalance = Number(vipCustomer.balance);
+  ui.consumeSharedWallets();
+  assert(Number(vipCustomer.balance) < beforeVipBalance, 'VIP charge-after-limit did not consume wallet after quota');
+
   const beforeFree = Number(created.freeCredit || 0);
   get('inlineAccountAmount').value = '10000';
   get('inlineDiscountPercent').value = '10';
