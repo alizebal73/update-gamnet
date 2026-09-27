@@ -89,31 +89,18 @@ function showAccountAction(action,x){
   html+='</div></div>';document.getElementById('detail').innerHTML=html;
 }
 function confirmAccountAction(action,id){
-  const x=data().find(a=>a.id===id)||window._profileResource,amount=Number(document.getElementById('accountAmount')?.value||0);
-  if(action==='deduct'&&amount>(x.remainingValue||84500)){showToast('کسر اعتبار ثبت شد؛ '+(amount-(x.remainingValue||84500)).toLocaleString()+' تومان مازاد به بدهی مشتری منتقل می‌شود')}
-  else if(action==='discount'){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),bonus=Math.round(base*pct/100);showToast('پرداخت '+base.toLocaleString()+' تومان ثبت شد؛ '+bonus.toLocaleString()+' تومان وقت رایگان اضافه شد؛ ارزش کل '+(base+bonus).toLocaleString()+' تومان')}
-  else if(action==='charge'){
-    const live=previewCustomers.find(function(c){return c.name===x.customer||c.id===x.customerId});
-    if(live){live.balance=Number(live.balance||0)+amount;x.balance=live.balance;x.freeCredit=Number(live.freeCredit||0)}
-    showToast('شارژ '+amount.toLocaleString()+' تومان برای '+(live?('#'+live.id+' • '+live.name):'مشتری')+' ثبت شد');
-  } else showToast('عملیات '+({free:'اعتبار رایگان',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',deduct:'کسر اعتبار'}[action]||'حساب')+' ثبت شد');
+  const x=data().find(a=>a.id===id)||window._profileResource,amount=Number(document.getElementById('accountAmount')?.value||0),live=previewCustomers.find(c=>c.name===x.customer||c.id===x.customerId);
+  if(action==='charge'){if(live)live.balance=Number(live.balance||0)+amount;showToast('شارژ '+amount.toLocaleString()+' تومان ثبت شد')}
+  else if(action==='deduct'&&amount>(x.remainingValue||84500)){showToast('کسر اعتبار ثبت شد؛ '+(amount-(x.remainingValue||84500)).toLocaleString()+' تومان مازاد به بدهی مشتری منتقل می‌شود')}
+  else if(action==='discount'){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),bonus=Math.round(base*pct/100);if(live){live.balance=Number(live.balance||0)+base;live.freeCredit=Number(live.freeCredit||0)+bonus}showToast('پرداخت '+base.toLocaleString()+' تومان ثبت شد؛ '+bonus.toLocaleString()+' تومان وقت رایگان اضافه شد؛ ارزش کل '+(base+bonus).toLocaleString()+' تومان')}
+  else showToast('عملیات '+({free:'اعتبار رایگان',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',deduct:'کسر اعتبار'}[action]||'حساب')+' ثبت شد');
   openProfile(x);
 }
 function updateDiscountPreview(){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),d=Math.round(base*pct/100),total=base+d;if(document.getElementById('paidAmount'))document.getElementById('paidAmount').textContent=base.toLocaleString()+' تومان';if(document.getElementById('discountAmount'))document.getElementById('discountAmount').textContent=d.toLocaleString()+' تومان';if(document.getElementById('totalValue'))document.getElementById('totalValue').textContent=total.toLocaleString()+' تومان';if(document.getElementById('paidTime'))document.getElementById('paidTime').textContent=formatDiscountBaseTime(base,120000);if(document.getElementById('freeTime'))document.getElementById('freeTime').textContent=discountFreeTime(base,pct);if(document.getElementById('totalTime'))document.getElementById('totalTime').textContent=formatDiscountTotalTime(base,pct,120000)}
 
 
 function openProfile(x){
-  const live=previewCustomers.find(function(c){return c.name===x.customer||c.id===x.customerId});
-  const p=profileFor(x)||(live?[live.name,live.id,live.phone||'—',Number(live.balance||0).toLocaleString()+' تومان',live.vipActive?(live.vip||'VIP'):'ندارد',live.unit||x.id,live.unit&&live.unit!=='—'?(live.unit+' • Session'):'—']:null);
-  if(!p){showToast('No customer profile attached');return}
-  if(live){
-    p[3]=Number(live.balance||0).toLocaleString()+' تومان';
-    p[4]=live.vipActive?(live.vip||'VIP'):'ندارد';
-    p[5]=live.unit||x.id;
-    p[6]=live.unit&&live.unit!=='—'?'Session':'—';
-    x.freeCredit=Number(live.freeCredit||0);
-    x.debt=Number(live.debt||0);
-  }
+  const p=profileFor(x);if(!p){showToast('No customer profile attached');return}
   window._profileResource=x;
   const remainingValue=x.remainingValue||84500,username=(x.customer||'customer').toLowerCase().replace(/[^a-z0-9]+/g,'.'),pin='••••';
   const vipActive=x.vipActive??(x.customer==='Armin'||x.customer==='Kian'||(p[4]&&p[4]!=='ندارد'&&p[4]!=='—')),vipPlan=x.vipPlan||((x.customer==='Armin')?'Gold':(x.customer==='Kian'?'Silver':(vipActive?p[4]:''))),vipExpiry=x.vipExpiry||'1405/08/27';
@@ -227,159 +214,27 @@ function getGameNetHotkeys(){try{return Object.assign({},defaultGameNetHotkeys,J
 function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next))}
 function toolbarMoney(n){return Number(n||0).toLocaleString('fa-IR')+' تومان'}
 function hotkeyResourceFromCustomer(c){return {id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,type:'pc',state:c.unit&&c.unit!=='—'?'Active':'Idle',customer:c.name,customerId:c.id,session:c.unit&&c.unit!=='—'?'Session':'—',remaining:'—',amount:toolbarMoney(c.balance||0),remainingValue:0,freeCredit:Number(c.freeCredit||0),debt:Number(c.debt||0)}}
-function findPreviewCustomer(query){const q=String(query||'').trim().toLowerCase();return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q||String(v||'').toLowerCase().includes(q)))}
-function getActiveHotkeyCustomer(){if(window._hotkeyCustomer){const c=previewCustomers.find(x=>x.id===window._hotkeyCustomer.id);if(c)return c}if(window._profileResource?.customer){const c=findPreviewCustomer(window._profileResource.customer);if(c)return c}return null}
-function openHotkeyCustomerSearch(pending){
-  window._pendingHotkeyAction=pending||null;
-  toolbarModal('بازکردن پروفایل مشتری','<div class="detail-alert">کد مشتری، نام کاربری یا نام را وارد کن و Enter بزن.</div><label style="display:block;margin-top:10px;font-size:8px;color:#66758a">شناسه مشتری</label><input id="hotkeyCustomerInput" autocomplete="off" placeholder="مثلاً 1010" style="width:100%;height:38px;margin-top:4px;border:1px solid #cfd9e7;border-radius:6px;padding:0 10px;font-size:11px"><div style="margin-top:8px;font-size:7.5px;color:#8995a6">میانبرهای عملیات از تنظیمات قابل تغییر هستند.</div><div class="actions"><button onclick="toolbarClose()">بستن</button><button class="primary" onclick="findHotkeyCustomer()">Enter / بازکردن</button></div>',520);
-  setTimeout(function(){const input=document.getElementById('hotkeyCustomerInput');if(input){input.focus();input.select();input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();findHotkeyCustomer()}})}},30)
-}
-function findHotkeyCustomer(){
-  const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');
-  if(!c){showToast('مشتری با این شناسه پیدا نشد');return}
-  const pending=window._pendingHotkeyAction;window._pendingHotkeyAction=null;toolbarClose();
-  window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);openProfile(window._profileResource);
-  showToast('پروفایل '+c.id+' باز شد');
-  if(pending&&pending!=='openCustomer')setTimeout(function(){openHotkeyAccountAction(pending)},50)
-}
-function openHotkeyCharge(){
-  const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch('chargeCustomer');return}window._hotkeyCustomer=c;
-  toolbarModal('شارژ سریع اعتبار','<div class="grid2"><div><small>مشتری</small><b style="display:block;margin-top:4px">#'+c.id+' • '+c.name+'</b></div><div><small>اعتبار فعلی</small><b style="display:block;margin-top:4px">'+toolbarMoney(c.balance||0)+'</b></div><div><small>مبلغ شارژ (تومان)</small><input id="hotkeyChargeAmount" type="number" min="0" step="1000" value="100000" style="width:100%;height:34px;font-size:11px"></div><div><small>درصد هدیه</small><input id="hotkeyChargeBonus" type="number" min="0" max="100" step="1" value="0" style="width:100%;height:34px;font-size:11px"></div></div><div class="discount-summary" style="margin-top:10px"><div><span>پرداختی</span><strong id="hkPaid">100,000 تومان</strong></div><div><span>رایگان</span><strong id="hkFree">0 تومان</strong></div><div><span>اعتبار اضافه‌شده</span><strong id="hkTotal">100,000 تومان</strong></div></div><div class="detail-alert" style="margin-top:10px">Enter = ثبت شارژ</div><div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="submitHotkeyCharge()">ثبت شارژ</button></div>',560);
-  setTimeout(function(){const amount=document.getElementById('hotkeyChargeAmount'),bonus=document.getElementById('hotkeyChargeBonus');if(amount){amount.focus();amount.select();const update=function(){const paid=Number(amount.value||0),pct=Math.max(0,Math.min(100,Number(bonus?.value||0))),free=Math.round(paid*pct/100),total=paid+free;document.getElementById('hkPaid').textContent=toolbarMoney(paid);document.getElementById('hkFree').textContent=toolbarMoney(free);document.getElementById('hkTotal').textContent=toolbarMoney(total)};amount.addEventListener('input',update);if(bonus)bonus.addEventListener('input',update)}},30)
-}
-function submitHotkeyCharge(){
-  const c=getActiveHotkeyCustomer();if(!c){showToast('ابتدا مشتری را انتخاب کن');return}
-  const paid=Math.max(0,Number(document.getElementById('hotkeyChargeAmount')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('hotkeyChargeBonus')?.value||0)));if(paid<=0){showToast('مبلغ شارژ باید بیشتر از صفر باشد');return}
-  const free=Math.round(paid*pct/100);c.balance=Number(c.balance||0)+paid;c.freeCredit=Number(c.freeCredit||0)+free;window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);toolbarClose();openProfile(window._profileResource);showToast('#'+c.id+' شارژ شد • پرداختی '+toolbarMoney(paid)+' • رایگان '+toolbarMoney(free)+' • اعتبار جدید '+toolbarMoney(c.balance))
-}
-function openHotkeyAccountAction(action){const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch(action);return}window._hotkeyCustomer=c;const resource=hotkeyResourceFromCustomer(c);window._profileResource=resource;openProfile(resource);setTimeout(function(){showAccountAction(action,resource)},40)}
-function confirmActiveHotkeyOperation(){if(document.getElementById('hotkeyChargeAmount')){submitHotkeyCharge();return true}const primary=document.getElementById('detail')?.querySelector('.operation-footer .primary');if(primary){primary.click();return true}return false}
-function openHotkeySettings(){
-  const hk=getGameNetHotkeys(),options=['Enter','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'],actions=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer'];
-  const select=function(id,value,allowEnter){const list=allowEnter?options:options.filter(x=>x!=='Enter');return '<select id="'+id+'" style="width:100%;height:32px">'+list.map(function(k){return '<option value="'+k+'" '+(k===value?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};
-  const rows=actions.map(function(k){return '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels[k]+'</strong><small>میانبر مستقل این عملیات</small></div><div></div>'+select('hk_'+k,hk[k],false)+'</div>'}).join('');
-  toolbarModal('میانبرهای اپراتور','<div class="detail-alert">مثال: F7 = شارژ، F6 = کسر اعتبار، F5 = ثبت بدهی. Enter ثبت عملیات را تأیید می‌کند.</div><div class="account-list" style="margin-top:10px">'+rows+'<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels.confirmAction+'</strong><small>ثبت / تأیید عملیات</small></div><div></div>'+select('hk_confirm',hk.confirmAction,true)+'</div></div><div class="actions"><button onclick="resetGameNetHotkeys()">بازگردانی</button><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveHotkeySettings()">ذخیره</button></div>',680)
-}
-function resetGameNetHotkeys(){saveGameNetHotkeys(Object.assign({},defaultGameNetHotkeys));showToast('میانبرهای پیش‌فرض بازگردانی شد');openHotkeySettings()}
-function saveHotkeySettings(){
-  const next={};gameNetHotkeyOrder.forEach(function(k){next[k]=document.getElementById('hk_'+k)?.value||defaultGameNetHotkeys[k]});
-  const keys=gameNetHotkeyOrder.filter(function(k){return k!=='confirmAction'}).map(function(k){return next[k]}).filter(function(k){return k!=='Enter'});
-  if(new Set(keys).size!==keys.length){showToast('دو عملیات نمی‌توانند یک F-key مشترک داشته باشند');return}
-  if(next.confirmAction!=='Enter'&&keys.includes(next.confirmAction)){showToast('کلید ثبت/تأیید با یکی از عملیات مشترک است');return}
-  saveGameNetHotkeys(next);showToast('میانبرهای اپراتور ذخیره شدند');toolbarClose()
-}
-(function installGameNetOperatorHotkeys(){
-  document.addEventListener('keydown',function(e){
-    if(e.ctrlKey||e.altKey||e.metaKey)return;const hk=getGameNetHotkeys(),key=e.key;
-    if(key==='Enter'&&document.getElementById('hotkeyCustomerInput'))return;
-    if(key===hk.openCustomer){e.preventDefault();openHotkeyCustomerSearch();return}
-    if(key===hk.chargeCustomer){e.preventDefault();openHotkeyCharge();return}
-    if(key===hk.deductCustomer){e.preventDefault();openHotkeyAccountAction('deduct');return}
-    if(key===hk.debtCustomer){e.preventDefault();openHotkeyAccountAction('debt');return}
-    if(key===hk.freeCustomer){e.preventDefault();openHotkeyAccountAction('free');return}
-    if(key===hk.payDebtCustomer){e.preventDefault();openHotkeyAccountAction('pay-debt');return}
-    if(key===hk.discountCustomer){e.preventDefault();openHotkeyAccountAction('discount');return}
-    if(key===hk.confirmAction&&key!=='Enter'){e.preventDefault();confirmActiveHotkeyOperation();return}
-    if(key==='Enter'){if(confirmActiveHotkeyOperation()){e.preventDefault()}}
-  })
-})();
+function findPreviewCustomer(query){const q=String(query||'').trim().toLowerCase();return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q))}
+function getActiveHotkeyCustomer(){if(window._hotkeyCustomer){const c=previewCustomers.find(x=>x.id===window._hotkeyCustomer.id);if(c)return c}if(window._profileResource?.customer)return findPreviewCustomer(window._profileResource.customer);return null}
+function openHotkeyCustomerSearch(pending){window._pendingHotkeyAction=pending||null;toolbarModal('بازکردن پروفایل مشتری','<div class="detail-alert">کد مشتری، نام کاربری یا نام را وارد کن و Enter بزن.</div><label style="display:block;margin-top:10px;font-size:8px;color:#66758a">شناسه مشتری</label><input id="hotkeyCustomerInput" autocomplete="off" placeholder="مثلاً 1010" style="width:100%;height:38px;margin-top:4px;border:1px solid #cfd9e7;border-radius:6px;padding:0 10px;font-size:11px"><div class="actions"><button onclick="toolbarClose()">بستن</button><button class="primary" onclick="findHotkeyCustomer()">Enter / بازکردن</button></div>',520);setTimeout(function(){const i=document.getElementById('hotkeyCustomerInput');if(i){i.focus();i.select();i.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();findHotkeyCustomer()}})}},30)}
+function findHotkeyCustomer(){const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');if(!c){showToast('مشتری با این شناسه پیدا نشد');return}const pending=window._pendingHotkeyAction;window._pendingHotkeyAction=null;toolbarClose();window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);openProfile(window._profileResource);if(pending&&pending!=='openCustomer')setTimeout(function(){openHotkeyAccountAction(pending)},50);showToast('پروفایل '+c.id+' باز شد')}
+function openHotkeyCharge(){const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch('chargeCustomer');return}window._hotkeyCustomer=c;toolbarModal('شارژ سریع اعتبار','<div class="grid2"><div><small>مشتری</small><b>#'+c.id+' • '+c.name+'</b></div><div><small>اعتبار فعلی</small><b>'+toolbarMoney(c.balance||0)+'</b></div><div><small>مبلغ شارژ (تومان)</small><input id="hotkeyChargeAmount" type="number" min="0" step="1000" value="100000" style="width:100%;height:34px;font-size:11px"></div><div><small>درصد هدیه</small><input id="hotkeyChargeBonus" type="number" min="0" max="100" value="0" style="width:100%;height:34px;font-size:11px"></div></div><div class="discount-summary" style="margin-top:10px"><div><span>پرداختی</span><strong id="hkPaid">100,000 تومان</strong></div><div><span>رایگان</span><strong id="hkFree">0 تومان</strong></div><div><span>اعتبار اضافه‌شده</span><strong id="hkTotal">100,000 تومان</strong></div></div><div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="submitHotkeyCharge()">ثبت شارژ</button></div>',560);setTimeout(function(){const a=document.getElementById('hotkeyChargeAmount'),b=document.getElementById('hotkeyChargeBonus');if(a){a.focus();a.select();const u=function(){const p=Number(a.value||0),q=Math.max(0,Math.min(100,Number(b?.value||0))),free=Math.round(p*q/100),total=p+free;document.getElementById('hkPaid').textContent=toolbarMoney(p);document.getElementById('hkFree').textContent=toolbarMoney(free);document.getElementById('hkTotal').textContent=toolbarMoney(total)};a.addEventListener('input',u);if(b)b.addEventListener('input',u)}},30)}
+function submitHotkeyCharge(){const c=getActiveHotkeyCustomer();if(!c){showToast('ابتدا مشتری را انتخاب کن');return}const p=Math.max(0,Number(document.getElementById('hotkeyChargeAmount')?.value||0)),q=Math.max(0,Math.min(100,Number(document.getElementById('hotkeyChargeBonus')?.value||0)));if(p<=0){showToast('مبلغ شارژ باید بیشتر از صفر باشد');return}const free=Math.round(p*q/100);c.balance=Number(c.balance||0)+p;c.freeCredit=Number(c.freeCredit||0)+free;window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);toolbarClose();openProfile(window._profileResource);showToast('#'+c.id+' شارژ شد • پرداختی '+toolbarMoney(p)+' • رایگان '+toolbarMoney(free)+' • اعتبار جدید '+toolbarMoney(c.balance))}
+function openHotkeyAccountAction(action){const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch(action);return}window._hotkeyCustomer=c;const r=hotkeyResourceFromCustomer(c);window._profileResource=r;openProfile(r);setTimeout(function(){showAccountAction(action,r)},40)}
+function confirmActiveHotkeyOperation(){if(document.getElementById('hotkeyChargeAmount')){submitHotkeyCharge();return true}const p=document.getElementById('detail')?.querySelector('.operation-footer .primary');if(p){p.click();return true}return false}
+function openHotkeySettings(){const hk=getGameNetHotkeys(),ops=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer'],keys=['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];const sel=function(id,v){return '<select id="'+id+'" style="width:100%;height:32px">'+keys.map(function(k){return '<option value="'+k+'" '+(k===v?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};const rows=ops.map(function(k){return '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels[k]+'</strong><small>میانبر این عملیات</small></div><div></div>'+sel('hk_'+k,hk[k])+'</div>'}).join('');toolbarModal('میانبرهای اپراتور','<div class="detail-alert">مثال: F7 = شارژ، F6 = کسر اعتبار، F5 = ثبت بدهی. Enter ثبت عملیات را تأیید می‌کند.</div><div class="account-list" style="margin-top:10px">'+rows+'<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels.confirmAction+'</strong><small>ثبت / تأیید عملیات</small></div><div></div><span style="font-size:9px;padding:7px">Enter</span></div></div><div class="actions"><button onclick="resetGameNetHotkeys()">بازگردانی</button><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveHotkeySettings()">ذخیره</button></div>',680)}
+function resetGameNetHotkeys(){saveGameNetHotkeys(Object.assign({},defaultGameNetHotkeys));openHotkeySettings();showToast('میانبرهای پیش‌فرض بازگردانی شد')}
+function saveHotkeySettings(){const next=Object.assign({},defaultGameNetHotkeys);gameNetHotkeyOrder.forEach(function(k){if(k!=='confirmAction')next[k]=document.getElementById('hk_'+k)?.value||defaultGameNetHotkeys[k]});const keys=gameNetHotkeyOrder.filter(k=>k!=='confirmAction').map(k=>next[k]);if(new Set(keys).size!==keys.length){showToast('دو عملیات نمی‌توانند یک F-key مشترک داشته باشند');return}saveGameNetHotkeys(next);toolbarClose();showToast('میانبرهای اپراتور ذخیره شدند')}
+(function installGameNetOperatorHotkeys(){document.addEventListener('keydown',function(e){if(e.ctrlKey||e.altKey||e.metaKey)return;const hk=getGameNetHotkeys(),key=e.key;if(key==='Enter'&&document.getElementById('hotkeyCustomerInput'))return;if(key===hk.openCustomer){e.preventDefault();openHotkeyCustomerSearch();return}if(key===hk.chargeCustomer){e.preventDefault();openHotkeyCharge();return}if(key===hk.deductCustomer){e.preventDefault();openHotkeyAccountAction('deduct');return}if(key===hk.debtCustomer){e.preventDefault();openHotkeyAccountAction('debt');return}if(key===hk.freeCustomer){e.preventDefault();openHotkeyAccountAction('free');return}if(key===hk.payDebtCustomer){e.preventDefault();openHotkeyAccountAction('pay-debt');return}if(key===hk.discountCustomer){e.preventDefault();openHotkeyAccountAction('discount');return}if(key==='Enter'&&confirmActiveHotkeyOperation()){e.preventDefault()}})})();
 (function addHotkeyDemoCustomer(){if(!previewCustomers.some(function(c){return c.id==='1010'})){previewCustomers.push({id:'1010',name:'مشتری 1010',username:'customer1010',phone:'0912***10',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'—',lastVisit:'Today',freeCredit:0,maxConcurrent:1,sharedTimePool:true,activeConnections:0})}})();
 function openTariff(){
   const r=tariffRates[tariffType];
-  document.getElementById('detail').innerHTML=\`<div class="detail" onclick="if(event.target===this)closeDetail()"><div class="tariffbox"><button class="close" onclick="closeDetail()">×</button><div class="eyebrow">Pricing / Tariff</div><h2>Resource tariff</h2><div class="tariffTabs"><button class="\${tariffType==='pc'?'sel':''}" onclick="setTariff('pc')">PC</button><button class="\${tariffType==='ps'?'sel':''}" onclick="setTariff('ps')">PlayStation</button><button class="\${tariffType==='fs'?'sel':''}" onclick="setTariff('fs')">Foosball</button></div><div class="tariffGrid"><label>قیمت هر ساعت<input id="rate" type="number" step="1000" value="\${r}"></label><label>مبلغ مشتری<input id="amount" type="number" step="1000" value="100000" oninput="updateTariff()"></label></div><div class="tariffResult"><div><small>زمان محاسبه‌شده</small><b id="calcTime">\${formatRateTime(r,100000)}</b></div><div><small>نرخ مؤثر</small><b>\${Number(r).toLocaleString()} تومان / ساعت</b></div></div><div class="vip-tariff-section"><div class="eyebrow">VIP subscription tariffs</div><h3>تعرفه اشتراک VIP</h3><div class="vip-tariff-table"><div class="vip-tariff-row vip-tariff-head"><span>سطح</span><span>۱ ماه</span><span>توضیح</span></div>\${vipPlans.map(v=>\`<div class="vip-tariff-row"><span><strong>\${v.label}</strong></span><span>\${v.price.toLocaleString()} تومان</span><span>\${v.note}</span></div>\`).join('')}</div><button class="ghost" onclick="openVipDialog(window._profileResource)">مدیریت اشتراک مشتری</button></div><div class="actions"><button onclick="showToast('Production must persist tariff + calculated duration on server')">Save tariff</button><button onclick="closeDetail()">Close</button></div></div></div>\`;
+  document.getElementById('detail').innerHTML=`<div class="detail" onclick="if(event.target===this)closeDetail()"><div class="tariffbox"><button class="close" onclick="closeDetail()">×</button><div class="eyebrow">Pricing / Tariff</div><h2>Resource tariff</h2><div class="tariffTabs"><button class="${tariffType==='pc'?'sel':''}" onclick="setTariff('pc')">PC</button><button class="${tariffType==='ps'?'sel':''}" onclick="setTariff('ps')">PlayStation</button><button class="${tariffType==='fs'?'sel':''}" onclick="setTariff('fs')">Foosball</button></div><div class="tariffGrid"><label>قیمت هر ساعت<input id="rate" type="number" step="1000" value="${r}"></label><label>مبلغ مشتری<input id="amount" type="number" step="1000" value="100000" oninput="updateTariff()"></label></div><div class="tariffResult"><div><small>زمان محاسبه‌شده</small><b id="calcTime">${formatRateTime(r,100000)}</b></div><div><small>نرخ مؤثر</small><b>${Number(r).toLocaleString()} تومان / ساعت</b></div></div><div class="vip-tariff-section"><div class="eyebrow">VIP subscription tariffs</div><h3>تعرفه اشتراک VIP</h3><div class="vip-tariff-table"><div class="vip-tariff-row vip-tariff-head"><span>سطح</span><span>۱ ماه</span><span>توضیح</span></div>${vipPlans.map(v=>`<div class="vip-tariff-row"><span><strong>${v.label}</strong></span><span>${v.price.toLocaleString()} تومان</span><span>${v.note}</span></div>`).join('')}</div><button class="ghost" onclick="openVipDialog(window._profileResource)">مدیریت اشتراک مشتری</button></div><div class="actions"><button onclick="showToast('Production must persist tariff + calculated duration on server')">Save tariff</button><button onclick="closeDetail()">Close</button></div></div></div>`;
 }
 function setTariff(t){tariffType=t;openTariff()}
 function updateTariff(){const rate=document.getElementById('rate')?.value||tariffRates[tariffType],amount=document.getElementById('amount')?.value||0;const el=document.getElementById('calcTime');if(el)el.textContent=formatRateTime(rate,amount)}
-function toolAction(name){
-  if(name==='مشتریان'){openHotkeyCustomerSearch();return}
-  if(name==='ادمین‌ها'){openStaffManager();return}
-  if(name==='تعرفه'){openTariff();return}
-  if(name==='شارژ'){openHotkeyCharge();return}
-  if(name==='تنظیمات'){openHotkeySettings();return}
-  showPage(({'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))
-}
-function manualTick(){[...ps,...fs].forEach(x=>{if(typeof x.remainingSeconds==='number'&&x.remainingSeconds>0){x.remainingSeconds--;const t=Math.max(0,x.remainingSeconds),m=Math.floor(t/60),sec=t%60;x.remaining=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');x.timeWarning=t<=600;x.timeUp=t<=0;x.notice=x.timeUp?'TIME UP':x.timeWarning?'Ending soon':'Running';x.timerLabel=x.timeUp?'00:00':Math.ceil(t/60)+' min';if(x.timeUp)x.state='Time Up';} });render()}
-setInterval(manualTick,1000)
-document.getElementById('events').innerHTML='<div class="event"><time>12:08</time><div><b>Session started</b><small>PC11 • 60 min package</small></div></div><div class="event"><time>12:04</time><div><b>Payment received</b><small>420,000 تومان • نقدی</small></div></div><div class="event"><time>11:58</time><div><b>PC04 paused</b><small>Network heartbeat recovered</small></div></div><div class="event"><time>11:46</time><div><b>New customer</b><small>Customer #1040 created</small></div></div>';
-render();
-const defaultGameNetHotkeys={openCustomer:'F1',chargeCustomer:'F4',deductCustomer:'F6',debtCustomer:'F5',freeCustomer:'F8',payDebtCustomer:'F9',discountCustomer:'F10',confirmAction:'Enter'};
-const gameNetHotkeyLabels={openCustomer:'بازکردن پروفایل مشتری',chargeCustomer:'شارژ اعتبار',deductCustomer:'کسر اعتبار',debtCustomer:'ثبت بدهی',freeCustomer:'اعتبار رایگان',payDebtCustomer:'پرداخت بدهی',discountCustomer:'پرداخت + هدیه زمانی',confirmAction:'ثبت / تأیید عملیات'};
-const gameNetHotkeyOrder=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer','confirmAction'];
-function getGameNetHotkeys(){try{return Object.assign({},defaultGameNetHotkeys,JSON.parse(localStorage.getItem('gamenet_hotkeys')||'{}'))}catch(e){return Object.assign({},defaultGameNetHotkeys)}}
-function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next))}
-function toolbarMoney(n){return Number(n||0).toLocaleString('fa-IR')+' تومان'}
-function hotkeyResourceFromCustomer(c){return {id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,type:'pc',state:c.unit&&c.unit!=='—'?'Active':'Idle',customer:c.name,customerId:c.id,session:c.unit&&c.unit!=='—'?'Session':'—',remaining:'—',amount:toolbarMoney(c.balance||0),remainingValue:0,freeCredit:Number(c.freeCredit||0),debt:Number(c.debt||0)}}
-function findPreviewCustomer(query){const q=String(query||'').trim().toLowerCase();return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q||String(v||'').toLowerCase().includes(q)))}
-function getActiveHotkeyCustomer(){if(window._hotkeyCustomer){const c=previewCustomers.find(x=>x.id===window._hotkeyCustomer.id);if(c)return c}if(window._profileResource?.customer){const c=findPreviewCustomer(window._profileResource.customer);if(c)return c}return null}
-function openHotkeyCustomerSearch(pending){
-  window._pendingHotkeyAction=pending||null;
-  toolbarModal('بازکردن پروفایل مشتری','<div class="detail-alert">کد مشتری، نام کاربری یا نام را وارد کن و Enter بزن.</div><label style="display:block;margin-top:10px;font-size:8px;color:#66758a">شناسه مشتری</label><input id="hotkeyCustomerInput" autocomplete="off" placeholder="مثلاً 1010" style="width:100%;height:38px;margin-top:4px;border:1px solid #cfd9e7;border-radius:6px;padding:0 10px;font-size:11px"><div style="margin-top:8px;font-size:7.5px;color:#8995a6">میانبرهای عملیات از تنظیمات قابل تغییر هستند.</div><div class="actions"><button onclick="toolbarClose()">بستن</button><button class="primary" onclick="findHotkeyCustomer()">Enter / بازکردن</button></div>',520);
-  setTimeout(function(){const input=document.getElementById('hotkeyCustomerInput');if(input){input.focus();input.select();input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();findHotkeyCustomer()}})}},30)
-}
-function findHotkeyCustomer(){
-  const c=findPreviewCustomer(document.getElementById('hotkeyCustomerInput')?.value||'');
-  if(!c){showToast('مشتری با این شناسه پیدا نشد');return}
-  const pending=window._pendingHotkeyAction;window._pendingHotkeyAction=null;toolbarClose();
-  window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);openProfile(window._profileResource);
-  showToast('پروفایل '+c.id+' باز شد');
-  if(pending&&pending!=='openCustomer')setTimeout(function(){openHotkeyAccountAction(pending)},50)
-}
-function openHotkeyCharge(){
-  const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch('chargeCustomer');return}window._hotkeyCustomer=c;
-  toolbarModal('شارژ سریع اعتبار','<div class="grid2"><div><small>مشتری</small><b style="display:block;margin-top:4px">#'+c.id+' • '+c.name+'</b></div><div><small>اعتبار فعلی</small><b style="display:block;margin-top:4px">'+toolbarMoney(c.balance||0)+'</b></div><div><small>مبلغ شارژ (تومان)</small><input id="hotkeyChargeAmount" type="number" min="0" step="1000" value="100000" style="width:100%;height:34px;font-size:11px"></div><div><small>درصد هدیه</small><input id="hotkeyChargeBonus" type="number" min="0" max="100" step="1" value="0" style="width:100%;height:34px;font-size:11px"></div></div><div class="discount-summary" style="margin-top:10px"><div><span>پرداختی</span><strong id="hkPaid">100,000 تومان</strong></div><div><span>رایگان</span><strong id="hkFree">0 تومان</strong></div><div><span>اعتبار اضافه‌شده</span><strong id="hkTotal">100,000 تومان</strong></div></div><div class="detail-alert" style="margin-top:10px">Enter = ثبت شارژ</div><div class="actions"><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="submitHotkeyCharge()">ثبت شارژ</button></div>',560);
-  setTimeout(function(){const amount=document.getElementById('hotkeyChargeAmount'),bonus=document.getElementById('hotkeyChargeBonus');if(amount){amount.focus();amount.select();const update=function(){const paid=Number(amount.value||0),pct=Math.max(0,Math.min(100,Number(bonus?.value||0))),free=Math.round(paid*pct/100),total=paid+free;document.getElementById('hkPaid').textContent=toolbarMoney(paid);document.getElementById('hkFree').textContent=toolbarMoney(free);document.getElementById('hkTotal').textContent=toolbarMoney(total)};amount.addEventListener('input',update);if(bonus)bonus.addEventListener('input',update)}},30)
-}
-function submitHotkeyCharge(){
-  const c=getActiveHotkeyCustomer();if(!c){showToast('ابتدا مشتری را انتخاب کن');return}
-  const paid=Math.max(0,Number(document.getElementById('hotkeyChargeAmount')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('hotkeyChargeBonus')?.value||0)));if(paid<=0){showToast('مبلغ شارژ باید بیشتر از صفر باشد');return}
-  const free=Math.round(paid*pct/100);c.balance=Number(c.balance||0)+paid;c.freeCredit=Number(c.freeCredit||0)+free;window._hotkeyCustomer=c;window._profileResource=hotkeyResourceFromCustomer(c);toolbarClose();openProfile(window._profileResource);showToast('#'+c.id+' شارژ شد • پرداختی '+toolbarMoney(paid)+' • رایگان '+toolbarMoney(free)+' • اعتبار جدید '+toolbarMoney(c.balance))
-}
-function openHotkeyAccountAction(action){const c=getActiveHotkeyCustomer();if(!c){openHotkeyCustomerSearch(action);return}window._hotkeyCustomer=c;const resource=hotkeyResourceFromCustomer(c);window._profileResource=resource;openProfile(resource);setTimeout(function(){showAccountAction(action,resource)},40)}
-function confirmActiveHotkeyOperation(){if(document.getElementById('hotkeyChargeAmount')){submitHotkeyCharge();return true}const primary=document.getElementById('detail')?.querySelector('.operation-footer .primary');if(primary){primary.click();return true}return false}
-function openHotkeySettings(){
-  const hk=getGameNetHotkeys(),options=['Enter','F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'],actions=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer'];
-  const select=function(id,value,allowEnter){const list=allowEnter?options:options.filter(x=>x!=='Enter');return '<select id="'+id+'" style="width:100%;height:32px">'+list.map(function(k){return '<option value="'+k+'" '+(k===value?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};
-  const rows=actions.map(function(k){return '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels[k]+'</strong><small>میانبر مستقل این عملیات</small></div><div></div>'+select('hk_'+k,hk[k],false)+'</div>'}).join('');
-  toolbarModal('میانبرهای اپراتور','<div class="detail-alert">مثال: F7 = شارژ، F6 = کسر اعتبار، F5 = ثبت بدهی. Enter ثبت عملیات را تأیید می‌کند.</div><div class="account-list" style="margin-top:10px">'+rows+'<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels.confirmAction+'</strong><small>ثبت / تأیید عملیات</small></div><div></div>'+select('hk_confirm',hk.confirmAction,true)+'</div></div><div class="actions"><button onclick="resetGameNetHotkeys()">بازگردانی</button><button onclick="toolbarClose()">انصراف</button><button class="primary" onclick="saveHotkeySettings()">ذخیره</button></div>',680)
-}
-function resetGameNetHotkeys(){saveGameNetHotkeys(Object.assign({},defaultGameNetHotkeys));showToast('میانبرهای پیش‌فرض بازگردانی شد');openHotkeySettings()}
-function saveHotkeySettings(){
-  const next={};gameNetHotkeyOrder.forEach(function(k){next[k]=document.getElementById('hk_'+k)?.value||defaultGameNetHotkeys[k]});
-  const keys=gameNetHotkeyOrder.filter(function(k){return k!=='confirmAction'}).map(function(k){return next[k]}).filter(function(k){return k!=='Enter'});
-  if(new Set(keys).size!==keys.length){showToast('دو عملیات نمی‌توانند یک F-key مشترک داشته باشند');return}
-  if(next.confirmAction!=='Enter'&&keys.includes(next.confirmAction)){showToast('کلید ثبت/تأیید با یکی از عملیات مشترک است');return}
-  saveGameNetHotkeys(next);showToast('میانبرهای اپراتور ذخیره شدند');toolbarClose()
-}
-(function installGameNetOperatorHotkeys(){
-  document.addEventListener('keydown',function(e){
-    if(e.ctrlKey||e.altKey||e.metaKey)return;const hk=getGameNetHotkeys(),key=e.key;
-    if(key==='Enter'&&document.getElementById('hotkeyCustomerInput'))return;
-    if(key===hk.openCustomer){e.preventDefault();openHotkeyCustomerSearch();return}
-    if(key===hk.chargeCustomer){e.preventDefault();openHotkeyCharge();return}
-    if(key===hk.deductCustomer){e.preventDefault();openHotkeyAccountAction('deduct');return}
-    if(key===hk.debtCustomer){e.preventDefault();openHotkeyAccountAction('debt');return}
-    if(key===hk.freeCustomer){e.preventDefault();openHotkeyAccountAction('free');return}
-    if(key===hk.payDebtCustomer){e.preventDefault();openHotkeyAccountAction('pay-debt');return}
-    if(key===hk.discountCustomer){e.preventDefault();openHotkeyAccountAction('discount');return}
-    if(key===hk.confirmAction&&key!=='Enter'){e.preventDefault();confirmActiveHotkeyOperation();return}
-    if(key==='Enter'){if(confirmActiveHotkeyOperation()){e.preventDefault()}}
-  })
-})();
-(function addHotkeyDemoCustomer(){if(!previewCustomers.some(function(c){return c.id==='1010'})){previewCustomers.push({id:'1010',name:'مشتری 1010',username:'customer1010',phone:'0912***10',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'—',lastVisit:'Today',freeCredit:0,maxConcurrent:1,sharedTimePool:true,activeConnections:0})}})();
-function openTariff(){
-  const r=tariffRates[tariffType];
-  document.getElementById('detail').innerHTML=\`<div class="detail" onclick="if(event.target===this)closeDetail()"><div class="tariffbox"><button class="close" onclick="closeDetail()">×</button><div class="eyebrow">Pricing / Tariff</div><h2>Resource tariff</h2><div class="tariffTabs"><button class="\${tariffType==='pc'?'sel':''}" onclick="setTariff('pc')">PC</button><button class="\${tariffType==='ps'?'sel':''}" onclick="setTariff('ps')">PlayStation</button><button class="\${tariffType==='fs'?'sel':''}" onclick="setTariff('fs')">Foosball</button></div><div class="tariffGrid"><label>قیمت هر ساعت<input id="rate" type="number" step="1000" value="\${r}"></label><label>مبلغ مشتری<input id="amount" type="number" step="1000" value="100000" oninput="updateTariff()"></label></div><div class="tariffResult"><div><small>زمان محاسبه‌شده</small><b id="calcTime">\${formatRateTime(r,100000)}</b></div><div><small>نرخ مؤثر</small><b>\${Number(r).toLocaleString()} تومان / ساعت</b></div></div><div class="vip-tariff-section"><div class="eyebrow">VIP subscription tariffs</div><h3>تعرفه اشتراک VIP</h3><div class="vip-tariff-table"><div class="vip-tariff-row vip-tariff-head"><span>سطح</span><span>۱ ماه</span><span>توضیح</span></div>\${vipPlans.map(v=>\`<div class="vip-tariff-row"><span><strong>\${v.label}</strong></span><span>\${v.price.toLocaleString()} تومان</span><span>\${v.note}</span></div>\`).join('')}</div><button class="ghost" onclick="openVipDialog(window._profileResource)">مدیریت اشتراک مشتری</button></div><div class="actions"><button onclick="showToast('Production must persist tariff + calculated duration on server')">Save tariff</button><button onclick="closeDetail()">Close</button></div></div></div>\`;
-}
-function setTariff(t){tariffType=t;openTariff()}
-function updateTariff(){const rate=document.getElementById('rate')?.value||tariffRates[tariffType],amount=document.getElementById('amount')?.value||0;const el=document.getElementById('calcTime');if(el)el.textContent=formatRateTime(rate,amount)}
-function toolAction(name){
-  if(name==='مشتریان'){openHotkeyCustomerSearch();return}
-  if(name==='ادمین‌ها'){openStaffManager();return}
-  if(name==='تعرفه'){openTariff();return}
-  if(name==='شارژ'){openHotkeyCharge();return}
-  if(name==='تنظیمات'){openHotkeySettings();return}
-  showPage(({'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))
-}
+function toolAction(name){if(name==='تعرفه'){openTariff();return}const map={'مشتریان':'Customers','شارژ':'Commercial / Wallet','دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','ادمین‌ها':'Branches & Staff','تنظیمات':'Settings','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'};showPage(map[name]||name)}
+function toolAction(name){if(name==='مشتریان'){openHotkeyCustomerSearch();return}if(name==='ادمین‌ها'){openStaffManager();return}if(name==='تعرفه'){openTariff();return}if(name==='شارژ'){openHotkeyCharge();return}if(name==='تنظیمات'){openHotkeySettings();return}showPage(({'دستگاه جدید':'PC Management','بازی‌ها':'Games','آمار':'Reports','پرداختی':'Payments','پشتیبان':'Backup','بازیابی':'Recovery','فعال‌سازی':'Activation','بروزرسانی':'Updates'}[name]||name))}
 function manualTick(){[...ps,...fs].forEach(x=>{if(typeof x.remainingSeconds==='number'&&x.remainingSeconds>0){x.remainingSeconds--;const t=Math.max(0,x.remainingSeconds),m=Math.floor(t/60),sec=t%60;x.remaining=String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');x.timeWarning=t<=600;x.timeUp=t<=0;x.notice=x.timeUp?'TIME UP':x.timeWarning?'Ending soon':'Running';x.timerLabel=x.timeUp?'00:00':Math.ceil(t/60)+' min';if(x.timeUp)x.state='Time Up';} });render()}
 setInterval(manualTick,1000)
 document.getElementById('events').innerHTML='<div class="event"><time>12:08</time><div><b>Session started</b><small>PC11 • 60 min package</small></div></div><div class="event"><time>12:04</time><div><b>Payment received</b><small>420,000 تومان • نقدی</small></div></div><div class="event"><time>11:58</time><div><b>PC04 paused</b><small>Network heartbeat recovered</small></div></div><div class="event"><time>11:46</time><div><b>New customer</b><small>Customer #1040 created</small></div></div>';
