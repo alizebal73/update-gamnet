@@ -20,14 +20,30 @@ body{min-width:1024px}.app{display:flex;height:100vh;width:100vw}.side{display:n
 .account-center-heading h2{margin:2px 0 3px;font-size:17px}
 .account-center-heading p{margin:0;color:#8995a6;font-size:9px}
 .hotkey-search-badge{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:1px solid #d7e0ec;border-radius:7px;background:#f7f9fc;color:#475670;padding:6px 9px;font-size:9px;font-weight:800}
-.account-quick-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
-.account-op-button{position:relative;min-height:82px;border:1px solid #dfe5ed;border-radius:9px;background:#f9fbfd;color:#263650;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:12px 8px 10px;transition:.15s ease}
-.account-op-button:hover{border-color:#9db8ee;background:#f2f6ff;transform:translateY(-1px);box-shadow:0 5px 16px rgba(47,111,237,.08)}
+.account-quick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:8px}
+.account-op-button{position:relative;min-height:58px;border:1px solid #dfe5ed;border-radius:7px;background:#f9fbfd;color:#263650;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;padding:7px 6px 6px;transition:.15s ease}
+.account-op-button:hover{border-color:#9db8ee;background:#f2f6ff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(47,111,237,.07)}
 .account-op-button:active{transform:translateY(0)}
-.account-op-icon{font-size:18px;line-height:1}
-.account-op-label{font-size:10px;font-weight:800}
-.account-op-hotkey{position:absolute;top:7px;left:7px;min-width:28px;padding:3px 5px;border-radius:5px;background:#202b40;color:#fff;font-size:8px;font-weight:800;text-align:center}
-.account-center-hint{margin-top:10px}
+.account-op-button:focus-visible{outline:2px solid #86a8e9;outline-offset:1px}
+.account-op-icon{font-size:14px;line-height:1}
+.account-op-label{font-size:8.5px;font-weight:800}
+.account-op-hotkey{position:absolute;top:4px;left:4px;min-width:22px;padding:2px 4px;border-radius:4px;background:#202b40;color:#fff;font-size:7px;font-weight:800;text-align:center}
+.account-center-hint{margin-top:8px}
+.inline-account-operation{margin-top:7px;border:1px solid #cfd9e8;border-radius:7px;background:#f8fbff;padding:8px 9px}
+.inline-account-operation[hidden]{display:none}
+.inline-account-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.inline-account-head strong,.inline-account-head small{display:block}.inline-account-head strong{font-size:9px;color:#33435c}.inline-account-head small{font-size:7.5px;color:#8a96a7;margin-top:2px}
+.inline-account-head .ghost{height:24px;min-width:24px;padding:0 6px;font-size:11px}
+.inline-operation-fields{display:grid;grid-template-columns:1fr 1.5fr;gap:7px;align-items:end}
+.inline-operation-fields label{font-size:8px;color:#65758b}
+.inline-operation-fields input,.inline-operation-fields select{display:block;width:100%;height:30px;margin-top:3px;border:1px solid #d4dde8;border-radius:5px;background:#fff;color:#33435c;padding:0 8px;font-size:9px}
+.inline-operation-fields input:focus,.inline-operation-fields select:focus{border-color:#86a8e9;box-shadow:0 0 0 2px rgba(47,111,237,.08);outline:none}
+.inline-operation-preview{min-height:30px;padding:6px 8px;border:1px solid #e0e6ee;border-radius:5px;background:#fff;font-size:8px;color:#68778c;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.inline-operation-preview span{display:inline-flex;gap:3px}.inline-operation-preview b{color:#2f6fed}
+.inline-operation-hint{margin-top:6px;font-size:7.5px;color:#8a96a7}
+.inline-vip-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 7px;border:1px solid #e0e6ee;background:#fff;border-radius:5px;font-size:8px;color:#68778c}
+@media (max-width:700px){.account-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.account-center-heading{flex-direction:column}}
+@media (max-width:480px){.account-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.inline-operation-fields{grid-template-columns:1fr}}
 @media (max-width:700px){.account-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.account-center-heading{flex-direction:column}}
 
 /* Unified Toolbar windows */
