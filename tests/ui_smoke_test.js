@@ -237,7 +237,6 @@ function runtimeFlowChecks(ctx) {
   assert(Number(created.debt) === 0, 'Debt payment did not clear the debt first');
   assert(Number(created.balance) === debtBeforeBalance + 10000, 'Debt payment remainder was not added to customer credit/time');
 
-  const beforeDiscountBalance = Number(created.balance || 0);
   ui.openCustomerEdit({ customerId: newId, customer: created.name });
   get('editCName').value = 'Edited Smoke Customer';
   get('editCUser').value = 'smoke.edited';
@@ -275,6 +274,7 @@ function runtimeFlowChecks(ctx) {
   ui.consumeSharedWallets();
   assert(Number(vipCustomer.balance) < beforeVipBalance, 'VIP charge-after-limit did not consume wallet after quota');
 
+  const beforeDiscountBalance = Number(created.balance || 0);
   const beforeFree = Number(created.freeCredit || 0);
   get('inlineAccountAmount').value = '10000';
   get('inlineDiscountPercent').value = '10';
