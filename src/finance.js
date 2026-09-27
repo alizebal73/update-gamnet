@@ -32,8 +32,31 @@ const previewCustomers=[
   {id:'1040',name:'Ali R.',username:'ali.r',phone:'0912***21',balance:120000,debt:0,vip:'Gold',vipActive:true,vipExpiry:'1405/08/27',unit:'PC01',lastVisit:'Today'},
   {id:'1041',name:'Sina M.',username:'sina.m',phone:'0919***14',balance:240000,debt:25000,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC03',lastVisit:'Today'},
   {id:'1042',name:'Reza K.',username:'reza.k',phone:'0935***08',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC04',lastVisit:'Yesterday'},
-  {id:'1043',name:'Armin',username:'armin',phone:'0910***42',balance:580000,debt:0,vip:'Gold',vipActive:true,vipExpiry:'1405/08/27',unit:'PC07',lastVisit:'2 days ago'}
+  {id:'1043',name:'Armin',username:'armin',phone:'0910***42',balance:580000,debt:0,vip:'Gold',vipActive:true,vipExpiry:'1405/08/27',unit:'PC07',lastVisit:'2 days ago'},
+  {id:'1044',name:'Nima',username:'nima',phone:'0911***11',balance:85000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC08',lastVisit:'Today'},
+  {id:'1045',name:'Amir',username:'amir',phone:'0902***55',balance:45000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC11',lastVisit:'Today'},
+  {id:'1046',name:'Pouya',username:'pouya',phone:'0913***66',balance:15000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC12',lastVisit:'Today'},
+  {id:'1047',name:'Hamed',username:'hamed',phone:'0930***44',balance:210000,debt:0,vip:'VIP',vipActive:true,vipExpiry:'1405/08/27',unit:'PC13',lastVisit:'Today'},
+  {id:'1048',name:'Soroush',username:'soroush',phone:'0918***77',balance:50000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PC15',lastVisit:'Today'},
+  {id:'2050',name:'Kian',username:'kian',phone:'0919***33',balance:70000,debt:0,vip:'VIP',vipActive:true,vipExpiry:'1405/08/27',unit:'PS01',lastVisit:'Today'},
+  {id:'2051',name:'Mahan',username:'mahan',phone:'0936***12',balance:10000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PS03',lastVisit:'Today'},
+  {id:'2052',name:'Ehsan',username:'ehsan',phone:'0912***10',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PS05',lastVisit:'Yesterday'},
+  {id:'2053',name:'Parsa',username:'parsa',phone:'0915***24',balance:35000,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'PS06',lastVisit:'Today'},
+  {id:'3001',name:'Team A',username:'team.a',phone:'—',balance:0,debt:0,vip:'—',vipActive:false,vipExpiry:'—',unit:'FS01',lastVisit:'Today'}
 ];
+
+function ensurePreviewCustomerSeeds(){
+  const seeds=previewCustomersSeedData;
+  seeds.forEach(function(seed){
+    const existing=previewCustomers.find(function(c){return c.id===seed.id});
+    if(existing){
+      Object.keys(seed).forEach(function(k){if(existing[k]===undefined)existing[k]=seed[k]});
+      return
+    }
+    previewCustomers.push(Object.assign({},seed,{activeSessions:[],freeCredit:0,maxConcurrent:1,sharedTimePool:true}))
+  });
+}
+const previewCustomersSeedData=previewCustomers.map(function(c){return Object.assign({},c)});
 const previewStaff=[
   {username:'admin',name:'مالک اصلی',role:'Owner',branch:'Main',permissions:'همه',customerProfile:'Full'},
   {username:'operator1',name:'اپراتور ۱',role:'Operator',branch:'Main',permissions:'جلسه + مشتری',customerProfile:'Wallet + Session'},
@@ -53,6 +76,8 @@ const previewPricing={normal:{pc:200000,ps:300000,fs:180000},vip:{pc:100000,ps:1
 let tariffType='pc',selectedTariffClass='normal';
 let previewOperations=[];
 const deviceTariffClass={},previewPayments=[{id:'PAY-1001',customerId:'1040',customer:'Ali R.',amount:120000,type:'نقدی',time:'12:04',note:'شارژ اعتبار'},{id:'PAY-1002',customerId:'1043',customer:'Armin',amount:300000,type:'کارت',time:'11:46',note:'شارژ + هدیه'},{id:'PAY-1003',customerId:'1041',customer:'Sina M.',amount:25000,type:'نقدی',time:'11:32',note:'پرداخت بدهی'}],previewGames=[{id:'G01',name:'Counter-Strike 2',category:'Steam',active:true},{id:'G02',name:'Valorant',category:'Riot',active:true},{id:'G03',name:'EA FC 26',category:'EA',active:true},{id:'G04',name:'Call of Duty',category:'Battle.net',active:true}],previewAppState={version:'0.9.8-preview',license:'DEMO-LOCAL',lastBackup:null};
+previewCustomers.forEach(function(c){if(typeof c.freeCredit!=='number')c.freeCredit=0;if(typeof c.maxConcurrent!=='number')c.maxConcurrent=1;if(c.sharedTimePool===undefined)c.sharedTimePool=true;if(!Array.isArray(c.activeSessions))c.activeSessions=[];});
+ensurePreviewCustomerSeeds();
 previewCustomers.forEach(function(c){if(typeof c.freeCredit!=='number')c.freeCredit=0;if(typeof c.maxConcurrent!=='number')c.maxConcurrent=1;if(c.sharedTimePool===undefined)c.sharedTimePool=true;if(!Array.isArray(c.activeSessions))c.activeSessions=[];});
 [...pcs,...ps,...fs].forEach(function(d){if(!deviceTariffClass[d.id])deviceTariffClass[d.id]=(d.id==='PC07'||d.id==='PC08'||d.id==='PS01')?'vip':'normal';});
 previewStaff.forEach(function(x){if(!Array.isArray(x.permissions)){if(x.role==='Owner'||x.permissions==='همه')x.permissions=previewPermissions.map(function(p){return p[0]});else if(x.permissions==='جلسه + مشتری')x.permissions=['sessions','customers.view','customers.wallet'];else x.permissions=['sessions']}if(!Array.isArray(x.customerPermissions)){if(x.customerProfile==='Full')x.customerPermissions=previewCustomerPermissions.map(function(p){return p[0]});else if(x.customerProfile==='Wallet + Session')x.customerPermissions=['wallet','freeCredit','debt','deduct','history','transfer'];else x.customerPermissions=['identity']}});
@@ -122,6 +147,7 @@ function hydratePersistentState(){
     const obj=JSON.parse(raw);if(!obj||(![2,3,4].includes(obj.schema)))return false;
     if(Array.isArray(obj.appliedOperationIds))_appliedOperationIds=obj.appliedOperationIds.slice(-300);
     if(Array.isArray(obj.customers))previewCustomers.splice(0,previewCustomers.length,...obj.customers);
+    ensurePreviewCustomerSeeds();
     if(Array.isArray(obj.pcs))pcs.splice(0,pcs.length,...obj.pcs);
     if(Array.isArray(obj.ps))ps.splice(0,ps.length,...obj.ps);
     if(Array.isArray(obj.fs))fs.splice(0,fs.length,...obj.fs);
