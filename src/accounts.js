@@ -48,11 +48,10 @@ function inlineAccountAction(action){
   if(!live){showToast('ابتدا مشتری را انتخاب کن');return}
   const panel=document.getElementById('inlineAccountOperation');
   if(!panel){openProfile(resource);const fresh=document.getElementById('inlineAccountOperation');if(fresh){renderInlineAccountOperation(action,live)}return}
-  const amount=Number(document.getElementById('inlineAccountAmount')?.value||0);
-  const same=panel.dataset.action===action;
-  if(panel.hidden||!same){renderInlineAccountOperation(action,live);return}
-  if(amount<=0&&!['discount','vip'].includes(action)){showToast('مبلغ را وارد کن');document.getElementById('inlineAccountAmount')?.focus();return}
+  if(panel.hidden){renderInlineAccountOperation(action,live);return}
   if(action==='vip'){openVipDialog(resource);return}
+  const amount=Number(document.getElementById('inlineAccountAmount')?.value||0);
+  if(amount<=0){renderInlineAccountOperation(action,live);return}
   executeInlineAccountOperation(action,live);
 }
 
