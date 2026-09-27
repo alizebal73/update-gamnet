@@ -301,12 +301,13 @@ function runtimeFlowChecks(ctx) {
   ui.openVipPlanSettings();
   get('vipPlanLabel_silver').value = 'Silver Daily';
   get('vipPlanPrice_silver').value = '1900000';
-  get('vipPlanMonths_silver').value = '1';
+  get('vipPlanDays_silver').value = '15';
   get('vipPlanHours_silver').value = '3';
   get('vipPlanNote_silver').value = 'روزانه ۳ ساعت';
   ui.saveVipPlanSettings();
   assert(Number(silver.dailyHours) === 3, 'VIP plan settings did not save daily hours');
   assert(Number(silver.price) === 1900000, 'VIP plan settings did not save price');
+  assert(Number(silver.days) === 15, 'VIP plan settings did not save default days');
   ui.openVipDialog(ui.window._profileResource);
   assert(get('detail').innerHTML.includes('3 ساعت'), 'VIP dialog did not show configured daily quota');
 
