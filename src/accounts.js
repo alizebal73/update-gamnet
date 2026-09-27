@@ -36,44 +36,30 @@ function renderAccountOperationButtons(cc){
     ['discount','پرداخت + هدیه','⏱','discountCustomer'],
     ['vip','خرید / تمدید VIP','⭐','vipCustomer']
   ];
-  return '<div class="account-operations-block"><div class="account-section-title"><div><div class="eyebrow">Quick payment</div><h3>عملیات سریع حساب</h3></div><span>اول کادر مبلغ را باز کن؛ سپس با کلیک کارت یا هات‌کی عملیات ثبت می‌شود.</span></div><div class="account-quick-actions">'+ops.map(function(o){
+  return '<div class="account-operations-block"><div class="account-section-title"><div><div class="eyebrow">Quick account actions</div><h3>عملیات حساب</h3></div><span>مبلغ را پایین وارد کن؛ سپس کارت یا هات‌کی عملیات را اجرا کن.</span></div><div class="account-quick-actions">'+ops.map(function(o){
     const shortcut=hk[o[3]]||'';
     return '<button type="button" class="account-op-button" onclick="inlineAccountAction(\''+o[0]+'\')"><span class="account-op-icon">'+o[2]+'</span><span class="account-op-label">'+o[1]+'</span>'+(shortcut?'<span class="account-op-hotkey">'+escapeHtml(shortcut)+'</span>':'')+'</button>';
-  }).join('')+'</div><div id="inlineAccountOperation" class="inline-account-operation" hidden></div></div>';
+  }).join('')+'</div><div class="inline-account-operation" id="inlineAccountOperation"><div class="inline-account-head"><div><strong id="inlineOperationTitle">مبلغ عملیات</strong><small id="inlineOperationHint">ابتدا مبلغ را وارد کن؛ بعد عملیات موردنظر را بزن.</small></div><span id="inlineSelectedHotkey" class="rate-badge">آماده</span></div><div class="inline-operation-fields"><label>مبلغ (تومان)<input id="inlineAccountAmount" type="number" min="0" step="1000" placeholder="مثلاً 100000"></label><div class="inline-operation-preview" id="inlineOperationPreview"><span>وضعیت حساب</span><strong>اعتبار '+Number(cc?.balance||0).toLocaleString()+' • رایگان '+Number(cc?.freeCredit||0).toLocaleString()+' • بدهی '+Number(cc?.debt||0).toLocaleString()+'</strong></div></div><div class="inline-operation-extra" id="inlineDiscountExtra" hidden><label>درصد هدیه<select id="inlineDiscountPercent" class="operation-select" onchange="updateInlineDiscountPreview()">'+[0,10,20,30,40,50,60,70,80,90,100].map(function(n){return '<option value="'+n+'" '+(n===10?'selected':'')+'>'+n+'٪</option>'}).join('')+'</select></label><div class="inline-operation-preview" id="inlineDiscountSummary"></div></div></div></div>';
 }
 
 function inlineAccountAction(action){
-  const resource=window._profileResource||{};
-  const live=previewCustomers.find(function(cc){return cc.id===resource.customerId||cc.id===resource.customer||cc.name===resource.customer});
+  const resource=window._profileResource||{},live=previewCustomers.find(function(cc){return cc.id===resource.customerId||cc.id===resource.customer||cc.name===resource.customer});
   if(!live){showToast('ابتدا مشتری را انتخاب کن');return}
-  const panel=document.getElementById('inlineAccountOperation');
-  if(!panel){openProfile(resource);const fresh=document.getElementById('inlineAccountOperation');if(fresh){renderInlineAccountOperation(action,live)}return}
-  if(panel.hidden){renderInlineAccountOperation(action,live);return}
-  if(action==='vip'){openVipDialog(resource);return}
-  const amount=Number(document.getElementById('inlineAccountAmount')?.value||0);
-  if(amount<=0){renderInlineAccountOperation(action,live);return}
-  executeInlineAccountOperation(action,live);
-}
-
-function renderInlineAccountOperation(action,live){
-  const panel=document.getElementById('inlineAccountOperation');if(!panel)return;
+  const panel=document.getElementById('inlineAccountOperation'),input=document.getElementById('inlineAccountAmount');
+  if(!panel||!input){openProfile(resource);return}
+  panel.dataset.action=action;
+  const hk=typeof getGameNetHotkeys==='function'?getGameNetHotkeys():{};
   const labels={charge:'شارژ اعتبار',deduct:'کسر اعتبار',debt:'ثبت بدهی',pay-debt:'پرداخت بدهی',free:'اعتبار رایگان',discount:'پرداخت + هدیه',vip:'خرید / تمدید VIP'};
-  const rate=getCustomerEffectiveRate(window._profileResource||{});
-  if(action==='vip'){
-    panel.hidden=false;panel.dataset.action=action;
-    panel.innerHTML='<div class="inline-account-head"><div><strong>خرید / تمدید VIP</strong><small>برای VIP تنظیمات پلن لازم است.</small></div><button type="button" class="ghost" onclick="closeInlineAccountOperation()">×</button></div><div class="inline-vip-row"><span>پلن VIP را از کارت VIP انتخاب کن</span><button class="primary" onclick="openVipDialog(window._profileResource)">انتخاب پلن</button></div>';
-    return;
-  }
-  const def='';
-  if(action==='discount'){
-    panel.hidden=false;panel.dataset.action=action;
-    panel.innerHTML='<div class="inline-account-head"><div><strong>'+labels[action]+'</strong><small>مبلغ پرداختی واقعی + درصد هدیه</small></div><button type="button" class="ghost" onclick="closeInlineAccountOperation()">×</button></div><div class="inline-operation-fields"><label>مبلغ پرداختی<input id="inlineAccountAmount" type="number" min="0" step="1000" value="'+def+'" oninput="updateInlineDiscountPreview()"></label><label>هدیه %<select id="inlineDiscountPercent" class="operation-select" onchange="updateInlineDiscountPreview()">'+[0,10,20,30,40,50,60,70,80,90,100].map(function(n){return '<option value="'+n+'" '+(n===10?'selected':'')+'>'+n+'٪</option>'}).join('')+'</select></label><div class="inline-operation-preview" id="inlineDiscountSummary"></div></div><div class="inline-operation-hint">Enter یا هات‌کی عملیات را ثبت می‌کند؛ کلیک روی هر کارت هم با همین مبلغ اجرا می‌شود.</div>';
-    updateInlineDiscountPreview();setTimeout(function(){document.getElementById('inlineAccountAmount')?.focus();document.getElementById('inlineAccountAmount')?.select()},20);
-    return;
-  }
-  panel.hidden=false;panel.dataset.action=action;
-  panel.innerHTML='<div class="inline-account-head"><div><strong>'+labels[action]+'</strong><small>نرخ مؤثر '+rate.toLocaleString()+' تومان/ساعت</small></div><button type="button" class="ghost" onclick="closeInlineAccountOperation()">×</button></div><div class="inline-operation-fields"><label>مبلغ (تومان)<input id="inlineAccountAmount" type="number" min="0" step="1000" value="'+def+'" onkeydown="if(event.key===\'Enter\'){event.preventDefault();executeInlineAccountOperation(\''+action+'\',null)}"></label><div class="inline-operation-preview"><span>حساب فعلی</span><strong>اعتبار '+Number(live.balance||0).toLocaleString()+' • رایگان '+Number(live.freeCredit||0).toLocaleString()+' • بدهی '+Number(live.debt||0).toLocaleString()+'</strong></div></div><div class="inline-operation-hint">مبلغ را وارد کن؛ سپس روی هر کارت یا هات‌کی همان عملیات بزن. Enter هم ثبت می‌کند.</div>';
-  setTimeout(function(){document.getElementById('inlineAccountAmount')?.focus();document.getElementById('inlineAccountAmount')?.select()},20);
+  const title=document.getElementById('inlineOperationTitle'),hint=document.getElementById('inlineOperationHint'),badge=document.getElementById('inlineSelectedHotkey'),extra=document.getElementById('inlineDiscountExtra');
+  if(title)title.textContent=labels[action]||'مبلغ عملیات';
+  if(hint)hint.textContent=action==='vip'?'VIP از پلن و مدت انتخاب می‌شود.':(action==='discount'?'مبلغ پرداختی را وارد کن و درصد هدیه را انتخاب کن.':'مبلغ را وارد کن و همین کارت یا هات‌کی را بزن.');
+  if(badge)badge.textContent=action==='vip'?'VIP':(hk[{charge:'chargeCustomer',deduct:'deductCustomer',debt:'debtCustomer','pay-debt':'payDebtCustomer',free:'freeCustomer',discount:'discountCustomer'}[action]]||'آماده');
+  if(extra)extra.hidden=action!=='discount';
+  if(action==='discount')updateInlineDiscountPreview();
+  const amount=Number(input.value||0);
+  if(action==='vip'){openVipDialog(resource);return}
+  if(amount>0)executeInlineAccountOperation(action,live);
+  else {input.focus();input.select()}
 }
 
 function executeInlineAccountOperation(action,liveArg){
@@ -86,6 +72,7 @@ function executeInlineAccountOperation(action,liveArg){
     const pct=Math.max(0,Math.min(100,Number(document.getElementById('inlineDiscountPercent')?.value||10)));
     op={action:'discount',customerId:live.id,base:base,percent:pct,bonus:Math.round(base*pct/100)};
   }
+  if(action==='vip'){openVipDialog(resource);return false}
   if(!commitAccountOperation(op))return false;
   const label={charge:'شارژ',deduct:'کسر اعتبار',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',free:'اعتبار رایگان',discount:'پرداخت + هدیه'}[action]||'عملیات حساب';
   showToast(label+' برای '+live.name+' ثبت شد');
@@ -93,7 +80,8 @@ function executeInlineAccountOperation(action,liveArg){
   return true;
 }
 
-function closeInlineAccountOperation(){const p=document.getElementById('inlineAccountOperation');if(p){p.hidden=true;p.innerHTML='';p.removeAttribute('data-action')}}
+function closeInlineAccountOperation(){}
+
 
 function updateInlineDiscountPreview(){
   const base=Number(document.getElementById('inlineAccountAmount')?.value||0),pct=Number(document.getElementById('inlineDiscountPercent')?.value||0),bonus=Math.round(base*pct/100),total=base+bonus;
@@ -106,7 +94,7 @@ function openProfile(x){
   const cc=previewCustomers.find(function(v){return v.id===x.customerId||v.id===x.customer||v.name===x.customer});
   const username=cc?.username||((x.customer||'customer').toLowerCase().replace(/[^a-z0-9]+/g,'.')),pin=cc?.pin||'••••',vipActive=!!(cc?.vipActive||x.vipActive),vipPlan=cc?.vipPlan||cc?.vip||'',vipExpiry=cc?.vipExpiry||'—',active=cc?.activeSessions||[],u=cc?calculateSharedUsage(cc):{totalRate:0,remainingSeconds:0},maxConcurrent=Number(cc?.maxConcurrent||1);
   const operations=cc?renderAccountOperationButtons(cc):'';
-  document.getElementById('detail').innerHTML='<div class="detail account-backdrop" onclick="if(event.target===this)closeDetail()"><div class="account-page account-profile-page"><button class="close" onclick="closeDetail()">×</button><div class="account-header"><div class="account-identity"><div class="avatarBig">'+String(p[0]).slice(0,1)+'</div><div><div class="eyebrow">Customer account</div><h2>'+escapeHtml(p[0])+'</h2><p>شناسه '+escapeHtml(p[1])+' • '+escapeHtml(p[2])+' • '+escapeHtml(x.id)+'</p></div></div><div class="account-header-actions"><button class="ghost" onclick="openCustomerEdit(window._profileResource)">✎ ویرایش</button><button class="ghost" onclick="openCustomerHistory(window._profileResource)">◷ سوابق</button></div></div><div class="account-meta-list"><div><span>نام</span><strong>'+escapeHtml(p[0])+'</strong></div><div><span>شناسه</span><strong>#'+escapeHtml(p[1])+'</strong></div><div><span>نام کاربری</span><strong>'+escapeHtml(username)+'</strong></div><div><span>PIN</span><strong>'+escapeHtml(pin)+'</strong></div><div><span>تلفن</span><strong>'+escapeHtml(p[2])+'</strong></div><div><span>VIP</span><strong>'+(vipActive?escapeHtml(vipPlan)+' • تا '+escapeHtml(vipExpiry):'فعال نیست')+'</strong></div><div><span>اتصالات</span><strong>'+active.length+' / '+maxConcurrent+'</strong></div><div><span>نرخ فعلی</span><strong>'+Number(u.totalRate||0).toLocaleString()+' تومان/ساعت</strong></div></div><div class="account-list-section"><div class="account-section-title"><div><div class="eyebrow">Account summary</div><h3>خلاصه حساب</h3></div><span>وضعیت مالی و Session فعلی</span></div><div class="account-list"><div class="account-row"><div class="account-row-label"><strong>اعتبار نقدی</strong><small>موجودی قابل مصرف</small></div><div class="account-value positive">'+Number(cc?.balance||parseToman(p[3])).toLocaleString()+' تومان</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>اعتبار رایگان</strong><small>وقت هدیه</small></div><div class="account-value positive">'+Number(cc?.freeCredit||0).toLocaleString()+' تومان</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>بدهی</strong><small>طرف حساب غیرنقدی</small></div><div class="account-value danger">'+Number(cc?.debt||0).toLocaleString()+' تومان</div><span></span></div><div class="account-row vip-account-row"><div class="account-row-label"><strong>VIP</strong><small>اشتراک مشتری</small></div><div class="account-value vip-membership-value">'+(vipActive?(escapeHtml(vipPlan)+' • تا '+escapeHtml(vipExpiry)):'فعال نیست')+'</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>Time Pool مشترک</strong><small>نرخ Sessionهای فعال جمع می‌شود</small></div><div class="account-value">'+formatSharedTime(u.remainingSeconds)+'</div><span></span></div></div></div><div class="account-operations-block"><div class="operation-head"><div><div class="eyebrow">Quick account actions</div><h3>عملیات حساب</h3></div><span class="account-operations-note">دکمه مستقیم</span></div>'+operations+'<div class="detail-alert account-center-hint">هر عملیات دکمه و هات‌کی مستقل دارد. F1 فقط برای جستجوی مشتری است.</div></div><div class="account-session-summary"><div class="account-row"><div class="account-row-label"><strong>Sessionهای فعال</strong><small>دستگاه‌های متصل</small></div><div class="account-value">'+(active.map(function(s){return escapeHtml(s.deviceId)}).join(' • ')||'بدون Session')+'</div><span></span></div></div><div class="modal-actions"><button class="ghost" onclick="closeDetail()">بستن پروفایل</button><button class="primary" onclick="openHotkeySettings()">تنظیم هات‌کی‌ها</button></div></div></div>';
+  document.getElementById('detail').innerHTML='<div class="detail account-backdrop" onclick="if(event.target===this)closeDetail()"><div class="account-page account-profile-page"><button class="close" onclick="closeDetail()">×</button><div class="account-header"><div class="account-identity"><div class="avatarBig">'+String(p[0]).slice(0,1)+'</div><div><div class="eyebrow">Customer account</div><h2>'+escapeHtml(p[0])+'</h2><p>شناسه '+escapeHtml(p[1])+' • '+escapeHtml(p[2])+' • '+escapeHtml(x.id)+'</p></div></div></div><div class="account-meta-list"><div><span>نام</span><strong>'+escapeHtml(p[0])+'</strong></div><div><span>شناسه</span><strong>#'+escapeHtml(p[1])+'</strong></div><div><span>نام کاربری</span><strong>'+escapeHtml(username)+'</strong></div><div><span>PIN</span><strong>'+escapeHtml(pin)+'</strong></div><div><span>تلفن</span><strong>'+escapeHtml(p[2])+'</strong></div><div><span>VIP</span><strong>'+(vipActive?escapeHtml(vipPlan)+' • تا '+escapeHtml(vipExpiry):'فعال نیست')+'</strong></div><div><span>اتصالات</span><strong>'+active.length+' / '+maxConcurrent+'</strong></div><div><span>نرخ فعلی</span><strong>'+Number(u.totalRate||0).toLocaleString()+' تومان/ساعت</strong></div></div><div class="account-list-section"><div class="account-section-title"><div><div class="eyebrow">Account summary</div><h3>خلاصه حساب</h3></div><span>وضعیت مالی و Session فعلی</span></div><div class="account-list"><div class="account-row"><div class="account-row-label"><strong>اعتبار نقدی</strong><small>موجودی قابل مصرف</small></div><div class="account-value positive">'+Number(cc?.balance||parseToman(p[3])).toLocaleString()+' تومان</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>اعتبار رایگان</strong><small>وقت هدیه</small></div><div class="account-value positive">'+Number(cc?.freeCredit||0).toLocaleString()+' تومان</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>بدهی</strong><small>طرف حساب غیرنقدی</small></div><div class="account-value danger">'+Number(cc?.debt||0).toLocaleString()+' تومان</div><span></span></div><div class="account-row vip-account-row"><div class="account-row-label"><strong>VIP</strong><small>اشتراک مشتری</small></div><div class="account-value vip-membership-value">'+(vipActive?(escapeHtml(vipPlan)+' • تا '+escapeHtml(vipExpiry)):'فعال نیست')+'</div><span></span></div><div class="account-row"><div class="account-row-label"><strong>Time Pool مشترک</strong><small>نرخ Sessionهای فعال جمع می‌شود</small></div><div class="account-value">'+formatSharedTime(u.remainingSeconds)+'</div><span></span></div></div></div>'+operations+'<div class="account-session-summary"><div class="account-row"><div class="account-row-label"><strong>Sessionهای فعال</strong><small>دستگاه‌های متصل</small></div><div class="account-value">'+(active.map(function(s){return escapeHtml(s.deviceId)}).join(' • ')||'بدون Session')+'</div><span></span></div></div><div class="modal-actions"><button class="ghost" onclick="closeDetail()">بستن پروفایل</button><button class="primary" onclick="openHotkeySettings()">تنظیم هات‌کی‌ها</button></div></div></div>';
 }
 
 function openAccountCenter(x){
