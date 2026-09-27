@@ -73,17 +73,19 @@ function showAccountAction(action,x){
 }
 
 function confirmAccountAction(action,id){
-  const x=data().find(function(a){return a.id===id})||window._profileResource,live=previewCustomers.find(function(cc){return cc.id===x.customerId||cc.name===x.customer});if(!live){showToast('حساب مشتری پیدا نشد');return}
+  const x=data().find(function(a){return a.id===id})||window._profileResource;
+  const live=previewCustomers.find(function(cc){return cc.id===x.customerId||cc.name===x.customer});if(!live){showToast('حساب مشتری پیدا نشد');return}
   const amount=Math.max(0,Number(document.getElementById('accountAmount')?.value||0));
-  if(action==='charge'){live.balance+=amount;addPayment(live,amount,'نقدی','شارژ اعتبار');persistAppState('charge');showToast('شارژ '+amount.toLocaleString()+' تومان ثبت شد')}
-  else if(action==='free'){live.freeCredit+=amount;persistAppState('free-credit');showToast('اعتبار رایگان اضافه شد')}
-  else if(action==='debt'){live.debt+=amount;persistAppState('debt');showToast('بدهی ثبت شد')}
-  else if(action==='pay-debt'){const pay=Math.min(amount,live.debt);live.debt-=pay;if(pay){addPayment(live,pay,'نقدی','پرداخت بدهی');persistAppState('debt-payment')}showToast('پرداخت بدهی '+pay.toLocaleString()+' تومان ثبت شد')}
-  else if(action==='deduct'){let rem=amount,a=Math.min(live.balance,rem);live.balance-=a;rem-=a;const f=Math.min(live.freeCredit,rem);live.freeCredit-=f;rem-=f;if(rem>0)live.debt+=rem;persistAppState('deduct');showToast(rem>0?'کسر انجام شد؛ مازاد به بدهی رفت':'کسر اعتبار ثبت شد')}
-  else if(action==='discount'){const base=Math.max(0,Number(document.getElementById('paymentBase')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('discountPercent')?.value||0))),bonus=Math.round(base*pct/100);live.balance+=base;live.freeCredit+=bonus;addPayment(live,base,'نقدی / کارت','پرداخت + '+pct+'٪ هدیه');persistAppState('discount');showToast('پرداخت '+base.toLocaleString()+' تومان + '+bonus.toLocaleString()+' تومان رایگان ثبت شد')}
+  let op={action:action,customerId:live.id,amount:amount};
+  if(action==='discount'){
+    const base=Math.max(0,Number(document.getElementById('paymentBase')?.value||0)),pct=Math.max(0,Math.min(100,Number(document.getElementById('discountPercent')?.value||0)));
+    op={action:'discount',customerId:live.id,base:base,percent:pct,bonus:Math.round(base*pct/100)};
+  }
+  if(!commitAccountOperation(op))return;
   openProfile({id:'CUSTOMER'+live.id,customer:live.name,customerId:live.id,type:'pc',state:'Idle',session:'—'});
+  showToast(action==='charge'?'شارژ ثبت و پایدار شد':'عملیات حساب ثبت و پایدار شد');
 }
- 
+
 function updateDiscountPreview(){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),d=Math.round(base*pct/100),total=base+d,rate=getCustomerEffectiveRate(window._profileResource||{});if(document.getElementById('paidAmount'))document.getElementById('paidAmount').textContent=base.toLocaleString()+' تومان';if(document.getElementById('discountAmount'))document.getElementById('discountAmount').textContent=d.toLocaleString()+' تومان';if(document.getElementById('totalValue'))document.getElementById('totalValue').textContent=total.toLocaleString()+' تومان';if(document.getElementById('paidTime'))document.getElementById('paidTime').textContent=formatDiscountBaseTime(base,rate);if(document.getElementById('freeTime'))document.getElementById('freeTime').textContent=discountFreeTime(base,pct,rate);if(document.getElementById('totalTime'))document.getElementById('totalTime').textContent=formatDiscountTotalTime(base,pct,rate)}
 function openProfile(x){
   const p=profileFor(x);if(!p){showToast('پروفایل مشتری پیدا نشد');return}
@@ -186,11 +188,88 @@ const deviceTariffClass={},previewPayments=[{id:'PAY-1001',customerId:'1040',cus
 previewCustomers.forEach(function(c){if(typeof c.freeCredit!=='number')c.freeCredit=0;if(typeof c.maxConcurrent!=='number')c.maxConcurrent=1;if(c.sharedTimePool===undefined)c.sharedTimePool=true;if(!Array.isArray(c.activeSessions))c.activeSessions=[];});
 [...pcs,...ps,...fs].forEach(function(d){if(!deviceTariffClass[d.id])deviceTariffClass[d.id]=(d.id==='PC07'||d.id==='PC08'||d.id==='PS01')?'vip':'normal';});
 const GAMENET_STATE_KEY='gamenet_preview_state_v2';
-let _persistTick=0;
-function serializableAppState(){return {schema:2,version:previewAppState.version,savedAt:Date.now(),license:previewAppState.license,lastBackup:previewAppState.lastBackup,customers:previewCustomers,pcs:pcs,ps:ps,fs:fs,pricing:previewPricing,devices:deviceTariffClass,payments:previewPayments,games:previewGames,staff:previewStaff,hotkeys:getGameNetHotkeys()}}
-function persistAppState(reason){try{localStorage.setItem(GAMENET_STATE_KEY,JSON.stringify(serializableAppState()));window._lastPersistReason=reason||'auto'}catch(e){showToast('ذخیره محلی انجام نشد')}}
+const GAMENET_JOURNAL_KEY='gamenet_financial_journal_v1';
+let _persistTick=0,_appliedOperationIds=[];
+function serializableAppState(){
+  return {schema:3,version:previewAppState.version,savedAt:Date.now(),license:previewAppState.license,lastBackup:previewAppState.lastBackup,appliedOperationIds:_appliedOperationIds.slice(-300),customers:previewCustomers,pcs:pcs,ps:ps,fs:fs,pricing:previewPricing,devices:deviceTariffClass,payments:previewPayments,games:previewGames,staff:previewStaff,hotkeys:getGameNetHotkeys()};
+}
+function persistAppState(reason){
+  try{localStorage.setItem(GAMENET_STATE_KEY,JSON.stringify(serializableAppState()));window._lastPersistReason=reason||'auto';return true}
+  catch(e){showToast('ذخیره پایدار انجام نشد؛ عملیات متوقف شد');return false}
+}
+function getOperationJournal(){try{return JSON.parse(localStorage.getItem(GAMENET_JOURNAL_KEY)||'[]')}catch(e){return []}}
+function writeOperationJournal(items){localStorage.setItem(GAMENET_JOURNAL_KEY,JSON.stringify(items))}
+function appendOperationJournal(op){
+  const j=getOperationJournal();if(j.some(function(x){return x.id===op.id}))return true;
+  j.push(op);writeOperationJournal(j);return true;
+}
+function markOperationApplied(id){
+  if(!_appliedOperationIds.includes(id))_appliedOperationIds.push(id);
+  _appliedOperationIds=_appliedOperationIds.slice(-300);
+}
+function compactOperationJournal(){
+  const applied=new Set(_appliedOperationIds),j=getOperationJournal(),left=j.filter(function(op){return !applied.has(op.id)});
+  if(left.length!==j.length)writeOperationJournal(left);
+}
+function applyAccountOperation(op,recordPayment){
+  const cc=previewCustomers.find(function(v){return v.id===op.customerId});if(!cc)return false;
+  const amount=Math.max(0,Number(op.amount||0));
+  if(op.action==='charge'){cc.balance=Number(cc.balance||0)+amount;if(recordPayment!==false)addPayment(cc,amount,'نقدی','شارژ اعتبار')}
+  else if(op.action==='free'){cc.freeCredit=Number(cc.freeCredit||0)+amount}
+  else if(op.action==='debt'){cc.debt=Number(cc.debt||0)+amount}
+  else if(op.action==='pay-debt'){const pay=Math.min(amount,Number(cc.debt||0));cc.debt=Math.max(0,Number(cc.debt||0)-pay);if(pay&&recordPayment!==false)addPayment(cc,pay,'نقدی','پرداخت بدهی')}
+  else if(op.action==='deduct'){let rem=amount,a=Math.min(Number(cc.balance||0),rem);cc.balance-=a;rem-=a;const f=Math.min(Number(cc.freeCredit||0),rem);cc.freeCredit-=f;rem-=f;if(rem>0)cc.debt=Number(cc.debt||0)+rem}
+  else if(op.action==='discount'){const base=Math.max(0,Number(op.base||0)),bonus=Math.max(0,Number(op.bonus||0));cc.balance=Number(cc.balance||0)+base;cc.freeCredit=Number(cc.freeCredit||0)+bonus;if(recordPayment!==false)addPayment(cc,base,'نقدی / کارت','پرداخت + '+Number(op.percent||0)+'٪ هدیه')}
+  else return false;
+  return true;
+}
+function commitAccountOperation(op){
+  op.id=op.id||('OP-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8));
+  op.ts=op.ts||Date.now();
+  appendOperationJournal(op);
+  if(!applyAccountOperation(op,true)){showToast('عملیات حساب ثبت نشد');return false}
+  markOperationApplied(op.id);
+  if(!persistAppState('account:'+op.action)){return false}
+  compactOperationJournal();
+  return true;
+}
+function replayUnappliedOperations(){
+  const j=getOperationJournal(),applied=new Set(_appliedOperationIds),remaining=[];
+  j.forEach(function(op){
+    if(applied.has(op.id))return;
+    if(applyAccountOperation(op,true)){markOperationApplied(op.id)}else remaining.push(op);
+  });
+  if(j.length)persistAppState('journal-replay');
+  const latest=getOperationJournal(),left=latest.filter(function(op){return !_appliedOperationIds.includes(op.id)});
+  if(left.length!==latest.length)writeOperationJournal(left);
+  return left.length===0;
+}
 function consumeElapsedUsage(seconds){const elapsed=Math.max(0,Number(seconds||0));if(!elapsed)return;previewCustomers.forEach(function(cc){const u=calculateSharedUsage(cc);if(!u.active.length||!u.totalRate)return;let rem=u.totalRate*elapsed/3600;const free=Math.min(Number(cc.freeCredit||0),rem);cc.freeCredit=Math.max(0,Number(cc.freeCredit||0)-free);rem-=free;if(rem>0)cc.balance=Math.max(0,Number(cc.balance||0)-rem);const after=calculateSharedUsage(cc);cc.activeSessions.forEach(function(s){const d=getDeviceById(s.deviceId);if(d){d.remainingSeconds=after.remainingSeconds;d.remaining=formatSharedTime(after.remainingSeconds);d.timerLabel=after.remainingSeconds<=0?'00:00':Math.ceil(after.remainingSeconds/60)+' min';d.timeWarning=after.remainingSeconds<=600&&after.remainingSeconds>0;d.timeUp=after.remainingSeconds<=0;d.notice=d.timeUp?'TIME UP':d.timeWarning?'Ending soon':'Running';if(d.timeUp)d.state='Time Up'}})})}
-function hydratePersistentState(){try{const raw=localStorage.getItem(GAMENET_STATE_KEY);if(!raw)return false;const obj=JSON.parse(raw);if(!obj||obj.schema!==2)return false;if(Array.isArray(obj.customers))previewCustomers.splice(0,previewCustomers.length,...obj.customers);if(Array.isArray(obj.pcs))pcs.splice(0,pcs.length,...obj.pcs);if(Array.isArray(obj.ps))ps.splice(0,ps.length,...obj.ps);if(Array.isArray(obj.fs))fs.splice(0,fs.length,...obj.fs);if(obj.pricing){Object.assign(previewPricing.normal,obj.pricing.normal||{});Object.assign(previewPricing.vip,obj.pricing.vip||{})}if(obj.devices){Object.keys(deviceTariffClass).forEach(function(k){delete deviceTariffClass[k]});Object.assign(deviceTariffClass,obj.devices)}if(Array.isArray(obj.payments))previewPayments.splice(0,previewPayments.length,...obj.payments);if(Array.isArray(obj.games))previewGames.splice(0,previewGames.length,...obj.games);if(Array.isArray(obj.staff))previewStaff.splice(0,previewStaff.length,...obj.staff);if(obj.hotkeys)saveGameNetHotkeys(obj.hotkeys);if(obj.license)previewAppState.license=obj.license;if(obj.lastBackup)previewAppState.lastBackup=obj.lastBackup;previewCustomers.forEach(function(cc){if(typeof cc.freeCredit!=='number')cc.freeCredit=0;if(typeof cc.maxConcurrent!=='number')cc.maxConcurrent=1;if(!Array.isArray(cc.activeSessions))cc.activeSessions=[]});const elapsed=Math.min(Math.max(0,Math.floor((Date.now()-Number(obj.savedAt||Date.now()))/1000)),2592000);if(elapsed)consumeElapsedUsage(elapsed);persistAppState('hydrate');return true}catch(e){showToast('اطلاعات ذخیره‌شده خوانده نشد');return false}}
+function hydratePersistentState(){
+  try{
+    const raw=localStorage.getItem(GAMENET_STATE_KEY);if(!raw)return false;
+    const obj=JSON.parse(raw);if(!obj||(![2,3].includes(obj.schema)))return false;
+    if(Array.isArray(obj.appliedOperationIds))_appliedOperationIds=obj.appliedOperationIds.slice(-300);
+    if(Array.isArray(obj.customers))previewCustomers.splice(0,previewCustomers.length,...obj.customers);
+    if(Array.isArray(obj.pcs))pcs.splice(0,pcs.length,...obj.pcs);
+    if(Array.isArray(obj.ps))ps.splice(0,ps.length,...obj.ps);
+    if(Array.isArray(obj.fs))fs.splice(0,fs.length,...obj.fs);
+    if(obj.pricing){Object.assign(previewPricing.normal,obj.pricing.normal||{});Object.assign(previewPricing.vip,obj.pricing.vip||{})}
+    if(obj.devices){Object.keys(deviceTariffClass).forEach(function(k){delete deviceTariffClass[k]});Object.assign(deviceTariffClass,obj.devices)}
+    if(Array.isArray(obj.payments))previewPayments.splice(0,previewPayments.length,...obj.payments);
+    if(Array.isArray(obj.games))previewGames.splice(0,previewGames.length,...obj.games);
+    if(Array.isArray(obj.staff))previewStaff.splice(0,previewStaff.length,...obj.staff);
+    if(obj.hotkeys)saveGameNetHotkeys(obj.hotkeys);
+    if(obj.license)previewAppState.license=obj.license;
+    if(obj.lastBackup)previewAppState.lastBackup=obj.lastBackup;
+    previewCustomers.forEach(function(cc){if(typeof cc.freeCredit!=='number')cc.freeCredit=0;if(typeof cc.maxConcurrent!=='number')cc.maxConcurrent=1;if(!Array.isArray(cc.activeSessions))cc.activeSessions=[]});
+    replayUnappliedOperations();
+    const elapsed=Math.min(Math.max(0,Math.floor((Date.now()-Number(obj.savedAt||Date.now()))/1000)),2592000);
+    if(elapsed)consumeElapsedUsage(elapsed);
+    persistAppState('hydrate');
+    return true
+  }catch(e){showToast('اطلاعات ذخیره‌شده خوانده نشد');return false}
+}
 window.addEventListener('beforeunload',function(){persistAppState('beforeunload')});
 function getDeviceById(id){return [...pcs,...ps,...fs].find(function(d){return d.id===id})||null}
 function getDeviceTariff(id){return deviceTariffClass[id]||'normal'}
@@ -257,7 +336,7 @@ const defaultGameNetHotkeys={openCustomer:'F1',chargeCustomer:'F4',deductCustome
 const gameNetHotkeyLabels={openCustomer:'بازکردن پروفایل مشتری',chargeCustomer:'شارژ اعتبار',deductCustomer:'کسر اعتبار',debtCustomer:'ثبت بدهی',freeCustomer:'اعتبار رایگان',payDebtCustomer:'پرداخت بدهی',discountCustomer:'پرداخت + هدیه زمانی',confirmAction:'ثبت / تأیید عملیات'};
 const gameNetHotkeyOrder=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer','confirmAction'];
 function getGameNetHotkeys(){try{return Object.assign({},defaultGameNetHotkeys,JSON.parse(localStorage.getItem('gamenet_hotkeys')||'{}'))}catch(e){return Object.assign({},defaultGameNetHotkeys)}}
-function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next))}
+function saveGameNetHotkeys(next){localStorage.setItem('gamenet_hotkeys',JSON.stringify(next));if(typeof persistAppState==='function')persistAppState('hotkeys')}
 function toolbarMoney(n){return Number(n||0).toLocaleString('fa-IR')+' تومان'}
 function hotkeyResourceFromCustomer(c){return {id:c.unit&&c.unit!=='—'?c.unit:'CUSTOMER'+c.id,type:'pc',state:c.unit&&c.unit!=='—'?'Active':'Idle',customer:c.name,customerId:c.id,session:c.unit&&c.unit!=='—'?'Session':'—',remaining:'—',amount:toolbarMoney(c.balance||0),remainingValue:0,freeCredit:Number(c.freeCredit||0),debt:Number(c.debt||0)}}
 function findPreviewCustomer(query){const q=String(query||'').trim().toLowerCase();return previewCustomers.find(c=>[c.id,c.username,c.name,c.phone].some(v=>String(v||'').toLowerCase()===q))}
@@ -296,7 +375,7 @@ function openCreateGame(){toolbarModal('بازی جدید','<div class="grid2"><
 function createPreviewGame(){const name=document.getElementById('newGameName')?.value.trim();if(!name){showToast('نام بازی الزامی است');return}previewGames.push({id:'G'+String(previewGames.length+1).padStart(2,'0'),name:name,category:document.getElementById('newGameCategory')?.value||'Other',active:true});persistAppState('game-create');toolbarClose();openGameManager()}
 function openReports(){const active=previewCustomers.reduce(function(n,cc){return n+cc.activeSessions.length},0),wallet=previewCustomers.reduce(function(n,cc){return n+Number(cc.balance||0)+Number(cc.freeCredit||0)},0),debt=previewCustomers.reduce(function(n,cc){return n+Number(cc.debt||0)},0);document.getElementById('detail').innerHTML='<div class="detail"><div class="toolbar-page"><button class="close" onclick="closeDetail()">×</button><div class="eyebrow">Reports</div><h2>آمار</h2><div class="toolbar-kpi"><div><span>مشتری</span><strong>'+previewCustomers.length+'</strong></div><div><span>Session فعال</span><strong>'+active+'</strong></div><div><span>اعتبار</span><strong>'+wallet.toLocaleString()+' تومان</strong></div><div><span>بدهی</span><strong>'+debt.toLocaleString()+' تومان</strong></div></div><div class="detail-alert">نرخ مصرف همزمان هر مشتری در همین مدل محاسبه می‌شود.</div></div></div>'}
 function openPayments(){const rows=previewPayments.map(function(p){return '<div class="toolbar-row" style="grid-template-columns:105px 95px 1fr 110px 100px"><span>'+p.id+'</span><span>'+p.time+'</span><span>'+p.customer+' • '+p.note+'</span><span>'+p.type+'</span><span>'+Number(p.amount||0).toLocaleString()+' تومان</span></div>'}).join('');document.getElementById('detail').innerHTML='<div class="detail"><div class="toolbar-page"><button class="close" onclick="closeDetail()">×</button><div class="head"><div><div class="eyebrow">Payments</div><h2>پرداختی‌ها</h2></div><button class="primary" onclick="openChargeManager()">＋ ثبت پرداخت</button></div><div class="toolbar-table"><div class="toolbar-row toolbar-head" style="grid-template-columns:105px 95px 1fr 110px 100px"><span>شناسه</span><span>زمان</span><span>مشتری / شرح</span><span>روش</span><span>مبلغ</span></div>'+rows+'</div></div></div>'}
-function openSettings(){const hk=getGameNetHotkeys();document.getElementById('detail').innerHTML='<div class="detail"><div class="toolbar-page"><button class="close" onclick="closeDetail()">×</button><div class="head"><div><div class="eyebrow">System settings</div><h2>تنظیمات</h2><p class="toolbar-sub">تعرفه، میانبر، کلاس دستگاه و Time Pool مشترک.</p></div><div class="toolbar-actions"><button class="primary" onclick="openHotkeySettings()">میانبرها</button><button onclick="openSharedTimeLab()">آزمایش زمان</button></div></div><div class="toolbar-grid"><div class="toolbar-card"><h3>PC عادی</h3><input id="rate_normal_pc" class="toolbar-input" type="number" value="'+previewPricing.normal.pc+'"><p>۱۰۰٬۰۰۰ = ۳۰ دقیقه در نمونه</p></div><div class="toolbar-card"><h3>PC VIP</h3><input id="rate_vip_pc" class="toolbar-input" type="number" value="'+previewPricing.vip.pc+'"><p>۱۰۰٬۰۰۰ = ۶۰ دقیقه در نمونه</p></div><div class="toolbar-card"><h3>Time Pool</h3><p>نرخ Sessionها با هم جمع می‌شود.</p><span class="rate-badge">فعال</span></div><div class="toolbar-card"><h3>PS عادی</h3><input id="rate_normal_ps" class="toolbar-input" type="number" value="'+previewPricing.normal.ps+'"></div><div class="toolbar-card"><h3>PS VIP</h3><input id="rate_vip_ps" class="toolbar-input" type="number" value="'+previewPricing.vip.ps+'"></div><div class="toolbar-card"><h3>Foosball</h3><input id="rate_normal_fs" class="toolbar-input" type="number" value="'+previewPricing.normal.fs+'"><input id="rate_vip_fs" class="toolbar-input" type="number" value="'+previewPricing.vip.fs+'" style="margin-top:5px"></div></div><div class="toolbar-actions"><button class="primary" onclick="savePricingConfig()">ذخیره تعرفه‌ها</button><button onclick="openDeviceManager()">تعرفه هر دستگاه</button><button onclick="openCustomerManager()">مشتریان</button></div><div class="lab-result"><b>میانبر:</b> '+hk.openCustomer+' مشتری • '+hk.chargeCustomer+' شارژ • '+hk.deductCustomer+' کسر • '+hk.debtCustomer+' بدهی • '+hk.discountCustomer+' هدیه • Enter تأیید</div></div></div>'}
+function openSettings(){const hk=getGameNetHotkeys();document.getElementById('detail').innerHTML='<div class="detail"><div class="toolbar-page"><button class="close" onclick="closeDetail()">×</button><div class="head"><div><div class="eyebrow">System settings</div><h2>تنظیمات</h2><p class="toolbar-sub">تعرفه، میانبر، کلاس دستگاه و Time Pool مشترک.</p></div><div class="toolbar-actions"><button class="primary" onclick="openHotkeySettings()">میانبرها</button><button onclick="openSharedTimeLab()">آزمایش زمان</button></div></div><div class="toolbar-grid"><div class="toolbar-card"><h3>PC عادی</h3><input id="rate_normal_pc" class="toolbar-input" type="number" value="'+previewPricing.normal.pc+'"><p>۱۰۰٬۰۰۰ = ۳۰ دقیقه در نمونه</p></div><div class="toolbar-card"><h3>PC VIP</h3><input id="rate_vip_pc" class="toolbar-input" type="number" value="'+previewPricing.vip.pc+'"><p>۱۰۰٬۰۰۰ = ۶۰ دقیقه در نمونه</p></div><div class="toolbar-card"><h3>Time Pool</h3><p>نرخ Sessionها با هم جمع می‌شود.</p><span class="rate-badge">فعال</span></div><div class="toolbar-card"><h3>PS عادی</h3><input id="rate_normal_ps" class="toolbar-input" type="number" value="'+previewPricing.normal.ps+'"></div><div class="toolbar-card"><h3>PS VIP</h3><input id="rate_vip_ps" class="toolbar-input" type="number" value="'+previewPricing.vip.ps+'"></div><div class="toolbar-card"><h3>Foosball</h3><input id="rate_normal_fs" class="toolbar-input" type="number" value="'+previewPricing.normal.fs+'"><input id="rate_vip_fs" class="toolbar-input" type="number" value="'+previewPricing.vip.fs+'" style="margin-top:5px"></div></div><div class="toolbar-actions"><button class="primary" onclick="savePricingConfig()">ذخیره تعرفه‌ها</button><button onclick="openDeviceManager()">تعرفه هر دستگاه</button><button onclick="openCustomerManager()">مشتریان</button></div><div class="lab-result"><b>ذخیره فوری:</b> هر عملیات مالی در همین لحظه در Snapshot و ژورنال عملیات ثبت می‌شود؛ قطع برق بعد از ثبت عملیات نباید تراکنش ثبت‌شده را از بین ببرد.<br><b>میانبر:</b> '+hk.openCustomer+' مشتری • '+hk.chargeCustomer+' شارژ • '+hk.deductCustomer+' کسر • '+hk.debtCustomer+' بدهی • '+hk.discountCustomer+' هدیه • Enter تأیید</div></div></div>'}
 function openSharedTimeLab(){const opts=previewCustomers.map(function(cc){return '<option value="'+cc.id+'">'+cc.id+' • '+cc.name+'</option>'}).join(''),dev=[...pcs,...ps,...fs].map(function(d){return '<option value="'+d.id+'">'+d.id+' • '+(getDeviceTariff(d.id)==='vip'?'VIP':'عادی')+' • '+getDeviceRate(d.id).toLocaleString()+' تومان/ساعت</option>'}).join('');document.getElementById('detail').innerHTML='<div class="detail"><div class="toolbar-page"><button class="close" onclick="closeDetail()">×</button><div class="eyebrow">Shared Time Pool</div><h2>آزمایش زمان همزمان</h2><p class="toolbar-sub">در مثال پیش‌فرض: ۱۰۰٬۰۰۰ عادی = ۳۰ دقیقه؛ VIP = ۶۰ دقیقه؛ هر دو همزمان = ۲۰ دقیقه.</p><div class="toolbar-grid"><div class="toolbar-card"><h3>دستگاه اول</h3><select id="labDevice1" class="toolbar-select">'+dev+'</select></div><div class="toolbar-card"><h3>دستگاه دوم</h3><select id="labDevice2" class="toolbar-select"><option value="">بدون دستگاه دوم</option>'+dev+'</select></div><div class="toolbar-card"><h3>موجودی</h3><input id="labBalance" class="toolbar-input" type="number" value="100000"></div></div><div id="sharedLabResult" class="lab-result"></div><div class="actions"><button onclick="openSettings()">بازگشت</button><button class="primary" onclick="applySharedLab()">اعمال Sessionها</button></div></div></div>';['labDevice1','labDevice2','labBalance'].forEach(function(id){document.getElementById(id)?.addEventListener('change',updateSharedLab);document.getElementById(id)?.addEventListener('input',updateSharedLab)});updateSharedLab()}
 function updateSharedLab(){const d1=getDeviceById(document.getElementById('labDevice1')?.value),d2=getDeviceById(document.getElementById('labDevice2')?.value),b=Math.max(0,Number(document.getElementById('labBalance')?.value||0)),r1=d1?getDeviceRate(d1.id):0,r2=d2?getDeviceRate(d2.id):0,total=r1+r2,one=r1?Math.floor(b/r1*3600):0,two=total?Math.floor(b/total*3600):0,el=document.getElementById('sharedLabResult');if(el)el.innerHTML='<div class="lab-lines"><div><span>نرخ اول</span><strong>'+r1.toLocaleString()+' تومان/ساعت</strong></div><div><span>نرخ دوم</span><strong>'+r2.toLocaleString()+' تومان/ساعت</strong></div><div><span>زمان مشترک</span><strong>'+formatSharedTime(two)+'</strong></div></div><div class="detail-alert">نرخ ترکیبی '+total.toLocaleString()+' تومان/ساعت • فقط اول '+formatSharedTime(one)+' • هر دو '+formatSharedTime(two)+'</div>'}
 function applySharedLab(){const d1=document.getElementById('labDevice1')?.value,d2=document.getElementById('labDevice2')?.value,cc=previewCustomers.find(function(x){return x.id==='1010'})||previewCustomers[0];if(!cc||!d1)return;cc.activeSessions.slice().forEach(function(s){removeCustomerSession(cc.id,s.deviceId)});cc.activeSessions=[];cc.balance=Math.max(0,Number(document.getElementById('labBalance')?.value||0));cc.freeCredit=0;cc.maxConcurrent=d2&&d2!==d1?2:1;startPreviewSession(cc.id,d1);if(d2&&d2!==d1)startPreviewSession(cc.id,d2);persistAppState('shared-lab');toolbarClose();openCustomerRecordPreview(cc.id)}
@@ -317,7 +396,7 @@ function setTariffClass(v){selectedTariffClass=v==='vip'?'vip':'normal';openTari
 function updateTariff(){const r=Number(document.getElementById('rate')?.value||0),a=Number(document.getElementById('amount')?.value||0),el=document.getElementById('calcTime');if(el)el.textContent=formatRateTime(r,a)}
 function saveTariffFromModal(){previewPricing[selectedTariffClass][tariffType]=Math.max(0,Number(document.getElementById('rate')?.value||0));persistAppState('tariff');showToast('تعرفه ذخیره شد');openTariff()}
 function toolAction(name){const map={'مشتریان':function(){showPage('Customers');openCustomerManager()},'شارژ':openChargeManager,'دستگاه جدید':openDeviceManager,'بازی‌ها':openGameManager,'تعرفه':openTariff,'آمار':openReports,'پرداختی':openPayments,'ادمین‌ها':function(){showPage('Branches & Staff');openStaffManager()},'تنظیمات':openSettings,'پشتیبان':openBackup,'بازیابی':openRecovery,'فعال‌سازی':openActivation,'بروزرسانی':openUpdates};if(map[name])return map[name]();showPage(name)}
-function manualTick(){consumeSharedWallets();_persistTick++;if(_persistTick%5===0)persistAppState('tick');[...ps,...fs].forEach(function(x){const owner=previewCustomers.find(function(cc){return cc.activeSessions.some(function(s){return s.deviceId===x.id})});if(owner)return;if(typeof x.remainingSeconds==='number'&&x.remainingSeconds>0){x.remainingSeconds--;const t=x.remainingSeconds;x.remaining=formatSharedTime(t);x.timeWarning=t<=600&&t>0;x.timeUp=t<=0;x.notice=x.timeUp?'TIME UP':x.timeWarning?'Ending soon':'Running';x.timerLabel=x.timeUp?'00:00':Math.ceil(t/60)+' min';if(x.timeUp)x.state='Time Up'}});render()}
+function manualTick(){consumeSharedWallets();_persistTick++;if(_persistTick%2===0)persistAppState('tick');[...ps,...fs].forEach(function(x){const owner=previewCustomers.find(function(cc){return cc.activeSessions.some(function(s){return s.deviceId===x.id})});if(owner)return;if(typeof x.remainingSeconds==='number'&&x.remainingSeconds>0){x.remainingSeconds--;const t=x.remainingSeconds;x.remaining=formatSharedTime(t);x.timeWarning=t<=600&&t>0;x.timeUp=t<=0;x.notice=x.timeUp?'TIME UP':x.timeWarning?'Ending soon':'Running';x.timerLabel=x.timeUp?'00:00':Math.ceil(t/60)+' min';if(x.timeUp)x.state='Time Up'}});render()}
 setInterval(manualTick,1000)
 hydratePersistentState();
 
