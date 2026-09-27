@@ -99,7 +99,17 @@ function updateDiscountPreview(){const base=Number(document.getElementById('paym
 
 
 function openProfile(x){
-  const p=profileFor(x);if(!p){showToast('No customer profile attached');return}
+  const live=previewCustomers.find(function(c){return c.name===x.customer||c.id===x.customerId});
+  const p=profileFor(x)||(live?[live.name,live.id,live.phone||'—',Number(live.balance||0).toLocaleString()+' تومان',live.vipActive?(live.vip||'VIP'):'ندارد',live.unit||x.id,live.unit&&live.unit!=='—'?(live.unit+' • Session'):'—']:null);
+  if(!p){showToast('No customer profile attached');return}
+  if(live){
+    p[3]=Number(live.balance||0).toLocaleString()+' تومان';
+    p[4]=live.vipActive?(live.vip||'VIP'):'ندارد';
+    p[5]=live.unit||x.id;
+    p[6]=live.unit&&live.unit!=='—'?'Session':'—';
+    x.freeCredit=Number(live.freeCredit||0);
+    x.debt=Number(live.debt||0);
+  }
   window._profileResource=x;
   const remainingValue=x.remainingValue||84500,username=(x.customer||'customer').toLowerCase().replace(/[^a-z0-9]+/g,'.'),pin='••••';
   const vipActive=x.vipActive??(x.customer==='Armin'||x.customer==='Kian'||(p[4]&&p[4]!=='ندارد'&&p[4]!=='—')),vipPlan=x.vipPlan||((x.customer==='Armin')?'Gold':(x.customer==='Kian'?'Silver':(vipActive?p[4]:''))),vipExpiry=x.vipExpiry||'1405/08/27';
