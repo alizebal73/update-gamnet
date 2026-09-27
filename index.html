@@ -114,7 +114,7 @@ function selectVipPlan(key){
   const x=vipPlans.find(v=>v.key===key)||vipPlans[0];
   window._selectedVipPlan=x.key;
   document.querySelectorAll('.vip-plan-tabs button').forEach(b=>b.classList.remove('selected'));
-  document.querySelector('.vip-plan-tabs button[onclick="selectVipPlan(\\''+key+'\\')"]')?.classList.add('selected');
+  document.querySelectorAll('.vip-plan-tabs button').forEach(b=>{if(b.textContent.trim().startsWith(x.label))b.classList.add('selected')});
   if(document.getElementById('vipPrice'))document.getElementById('vipPrice').value=x.price.toLocaleString();
   if(document.getElementById('vipPlanName'))document.getElementById('vipPlanName').textContent=x.label;
   updateVipPrice();
