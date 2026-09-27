@@ -22,9 +22,10 @@ function findHotkeyCustomer(){
   toolbarClose();
   window._hotkeyCustomer=c;
   window._profileResource=hotkeyResourceFromCustomer(c);
-  openAccountCenter(window._profileResource);
-  showToast('مشتری '+c.id+' پیدا شد؛ عملیات را از دکمه‌های حساب انتخاب کن')
+  openProfile(window._profileResource);
+  showToast('مشتری '+c.id+' پیدا شد')
 }
+
 
 function openHotkeyCharge(){openHotkeyAccountAction('charge')}
 function openHotkeyAccountAction(action){
