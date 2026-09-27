@@ -92,7 +92,11 @@ function confirmAccountAction(action,id){
   const x=data().find(a=>a.id===id)||window._profileResource,amount=Number(document.getElementById('accountAmount')?.value||0);
   if(action==='deduct'&&amount>(x.remainingValue||84500)){showToast('کسر اعتبار ثبت شد؛ '+(amount-(x.remainingValue||84500)).toLocaleString()+' تومان مازاد به بدهی مشتری منتقل می‌شود')}
   else if(action==='discount'){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),bonus=Math.round(base*pct/100);showToast('پرداخت '+base.toLocaleString()+' تومان ثبت شد؛ '+bonus.toLocaleString()+' تومان وقت رایگان اضافه شد؛ ارزش کل '+(base+bonus).toLocaleString()+' تومان')}
-  else showToast('عملیات '+({charge:'شارژ اعتبار',free:'اعتبار رایگان',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',deduct:'کسر اعتبار'}[action]||'حساب')+' ثبت شد');
+  else if(action==='charge'){
+    const live=previewCustomers.find(function(c){return c.name===x.customer||c.id===x.customerId});
+    if(live){live.balance=Number(live.balance||0)+amount;x.balance=live.balance;x.freeCredit=Number(live.freeCredit||0)}
+    showToast('شارژ '+amount.toLocaleString()+' تومان برای '+(live?('#'+live.id+' • '+live.name):'مشتری')+' ثبت شد');
+  } else showToast('عملیات '+({free:'اعتبار رایگان',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',deduct:'کسر اعتبار'}[action]||'حساب')+' ثبت شد');
   openProfile(x);
 }
 function updateDiscountPreview(){const base=Number(document.getElementById('paymentBase')?.value||0),pct=Number(document.getElementById('discountPercent')?.value||0),d=Math.round(base*pct/100),total=base+d;if(document.getElementById('paidAmount'))document.getElementById('paidAmount').textContent=base.toLocaleString()+' تومان';if(document.getElementById('discountAmount'))document.getElementById('discountAmount').textContent=d.toLocaleString()+' تومان';if(document.getElementById('totalValue'))document.getElementById('totalValue').textContent=total.toLocaleString()+' تومان';if(document.getElementById('paidTime'))document.getElementById('paidTime').textContent=formatDiscountBaseTime(base,120000);if(document.getElementById('freeTime'))document.getElementById('freeTime').textContent=discountFreeTime(base,pct);if(document.getElementById('totalTime'))document.getElementById('totalTime').textContent=formatDiscountTotalTime(base,pct,120000)}
