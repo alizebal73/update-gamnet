@@ -1,38 +1,101 @@
 const vipPlans=[
-  {key:'silver',label:'Silver',price:1800000,months:1,dailyHours:2,note:'روزانه ۲ ساعت رایگان تا پایان مدت اشتراک'},
-  {key:'gold',label:'Gold',price:2800000,months:1,dailyHours:4,note:'روزانه ۴ ساعت رایگان تا پایان مدت اشتراک'},
-  {key:'platinum',label:'Platinum',price:4200000,months:1,dailyHours:24,note:'تا ۲۴ ساعت در روز؛ عملاً VIP تمام‌روز'}
+  {key:'silver',label:'Silver',price:1800000,days:30,dailyHours:2,note:'روزانه ۲ ساعت رایگان تا پایان مدت اشتراک'},
+  {key:'gold',label:'Gold',price:2800000,days:30,dailyHours:4,note:'روزانه ۴ ساعت رایگان تا پایان مدت اشتراک'},
+  {key:'platinum',label:'Platinum',price:4200000,days:30,dailyHours:24,note:'تا ۲۴ ساعت در روز؛ عملاً VIP تمام‌روز'}
 ];
-const vipDurations=[1,3,6,12];
-function normalizeVipPlan(plan,index){if(!plan)plan=vipPlans[index]||{key:'vip'+index,label:'VIP '+(index+1),price:0,months:1,dailyHours:2,afterLimit:'block',note:''};if(!plan.key)plan.key='vip'+index;if(!plan.label)plan.label='VIP '+(index+1);plan.price=Math.max(0,Number(plan.price||0));plan.months=Math.max(1,Math.round(Number(plan.months||1)));plan.dailyHours=Math.max(0.5,Math.min(24,Number(plan.dailyHours||2)));if(plan.afterLimit!=='charge')plan.afterLimit='block';if(!plan.note)plan.note=plan.dailyHours>=24?'تا ۲۴ ساعت در روز':'روزانه '+plan.dailyHours+' ساعت رایگان';return plan}
+
+function normalizeVipPlan(plan,index){
+  if(!plan)plan=vipPlans[index]||{key:'vip'+index,label:'VIP '+(index+1),price:0,days:30,dailyHours:2,afterLimit:'block',note:''};
+  if(!plan.key)plan.key='vip'+index;
+  if(!plan.label)plan.label='VIP '+(index+1);
+  plan.price=Math.max(0,Number(plan.price||0));
+  if(plan.days===undefined||plan.days===null)plan.days=Math.max(1,Math.round(Number(plan.months||1)*30));
+  plan.days=Math.max(1,Math.round(Number(plan.days||30)));
+  plan.dailyHours=Math.max(0.5,Math.min(24,Number(plan.dailyHours||2)));
+  if(plan.afterLimit!=='charge')plan.afterLimit='block';
+  if(!plan.note)plan.note=plan.dailyHours>=24?'تا ۲۴ ساعت در روز':'روزانه '+plan.dailyHours+' ساعت رایگان';
+  return plan;
+}
 function normalizeAllVipPlans(){vipPlans.forEach(normalizeVipPlan)}
 function vipDailyText(plan){return Number(plan?.dailyHours||0)>=24?'تا ۲۴ ساعت در روز':Number(plan?.dailyHours||0)+' ساعت در روز'}
 function vipAfterLimitText(plan){return plan?.afterLimit==='charge'?'ادامه با اعتبار عادی':'توقف در پایان سهمیه'}
-function getVipPlanConfig(cc){if(!cc||!cc.vipActive)return null;if(cc.vipPlanKey){const keyed=vipPlans.find(function(p){return p.key===cc.vipPlanKey});if(keyed)return keyed}const legacy=String(cc.vip||'').trim().toLowerCase();if(legacy){const byLabel=vipPlans.find(function(p){return String(p.label||'').trim().toLowerCase()===legacy});if(byLabel)return byLabel}return vipPlans[0]||null}
+function getVipPlanConfig(cc){
+  if(!cc||!cc.vipActive)return null;
+  if(cc.vipPlanKey){const keyed=vipPlans.find(function(p){return p.key===cc.vipPlanKey});if(keyed)return keyed}
+  const legacy=String(cc.vip||'').trim().toLowerCase();
+  if(legacy){const byLabel=vipPlans.find(function(p){return String(p.label||'').trim().toLowerCase()===legacy});if(byLabel)return byLabel}
+  return vipPlans[0]||null;
+}
 function vipDayKey(ts){const d=new Date(Number(ts||Date.now()));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function resetVipDailyUsage(cc){const key=vipDayKey();if(cc.vipDailyUsageKey!==key){cc.vipDailyUsageKey=key;cc.vipDailyUsedSeconds=0}if(typeof cc.vipDailyUsedSeconds!=='number'||cc.vipDailyUsedSeconds<0)cc.vipDailyUsedSeconds=0}
 function isVipCurrentlyActive(cc){if(!cc||!cc.vipActive)return false;return !Number(cc.vipExpiryTs||0)||Number(cc.vipExpiryTs)>Date.now()}
 function getVipDailyRemainingSeconds(cc){if(!isVipCurrentlyActive(cc))return 0;const plan=getVipPlanConfig(cc);if(!plan)return 0;resetVipDailyUsage(cc);return Math.max(0,Math.round(Number(plan.dailyHours||0)*3600-Number(cc.vipDailyUsedSeconds||0)))}
 
 normalizeAllVipPlans();
+
 function openVipPlanSettings(){
- const rows=vipPlans.map(function(plan){return '<div class="vip-config-row"><div class="vip-config-name"><b>'+escapeHtml(plan.label)+'</b><small>'+escapeHtml(plan.key)+'</small></div><label>نام<input id="vipPlanLabel_'+plan.key+'" value="'+escapeHtml(plan.label)+'"></label><label>قیمت (تومان)<input id="vipPlanPrice_'+plan.key+'" type="number" min="0" step="1000" value="'+Number(plan.price||0)+'"></label><label>مدت پیش‌فرض (ماه)<input id="vipPlanMonths_'+plan.key+'" type="number" min="1" step="1" value="'+Number(plan.months||1)+'"></label><label>ساعت مجاز روزانه<input id="vipPlanHours_'+plan.key+'" type="number" min="0.5" max="24" step="0.5" value="'+Number(plan.dailyHours||2)+'"></label><label>بعد از اتمام سهمیه<select id="vipPlanAfter_'+plan.key+'" class="operation-select"><option value="block" '+(plan.afterLimit==='block'?'selected':'')+'>توقف Session</option><option value="charge" '+(plan.afterLimit==='charge'?'selected':'')+'>ادامه با اعتبار</option></select></label><label>توضیح<input id="vipPlanNote_'+plan.key+'" value="'+escapeHtml(plan.note||'')+'"></label></div>'}).join('');
- document.getElementById('detail').innerHTML='<div class="detail"><div class="account-page vip-settings-page"><button class="close" onclick="openVipDialog(window._profileResource)">×</button><div class="eyebrow">VIP PLAN SETTINGS</div><h2>مدیریت پلن‌های VIP</h2><p class="vip-subtitle">برای هر پلن قیمت، مدت و سقف ساعت روزانه را جداگانه تعیین کن.</p><div class="vip-config-table">'+rows+'</div><div class="detail-alert">مثال: Silver = روزی ۲ ساعت تا ۱ ماه؛ Platinum = تا ۲۴ ساعت در روز.</div><div class="modal-actions"><button class="ghost" onclick="openVipDialog(window._profileResource)">انصراف</button><button class="primary" onclick="saveVipPlanSettings()">✓ تأیید و ذخیره پلن‌ها</button></div></div></div>';
+ const rows=vipPlans.map(function(plan){
+  return '<div class="vip-config-row"><div class="vip-config-name"><b>'+escapeHtml(plan.label)+'</b><small>'+escapeHtml(plan.key)+'</small></div><label>نام<input id="vipPlanLabel_'+plan.key+'" value="'+escapeHtml(plan.label)+'"></label><label>قیمت پلن (تومان)<input id="vipPlanPrice_'+plan.key+'" type="number" min="0" step="1000" value="'+Number(plan.price||0)+'"></label><label>مدت پیش‌فرض (روز)<input id="vipPlanDays_'+plan.key+'" type="number" min="1" step="1" value="'+Number(plan.days||30)+'"></label><label>ساعت مجاز روزانه<input id="vipPlanHours_'+plan.key+'" type="number" min="0.5" max="24" step="0.5" value="'+Number(plan.dailyHours||2)+'"></label><label>بعد از اتمام سهمیه<select id="vipPlanAfter_'+plan.key+'" class="operation-select"><option value="block" '+(plan.afterLimit==='block'?'selected':'')+'>توقف Session</option><option value="charge" '+(plan.afterLimit==='charge'?'selected':'')+'>ادامه با اعتبار</option></select></label><label>توضیح<input id="vipPlanNote_'+plan.key+'" value="'+escapeHtml(plan.note||'')+'"></label></div>';
+ }).join('');
+ document.getElementById('detail').innerHTML='<div class="detail"><div class="account-page vip-settings-page"><button class="close" onclick="openVipDialog(window._profileResource)">×</button><div class="eyebrow">VIP PLAN SETTINGS</div><h2>مدیریت پلن‌های VIP</h2><p class="vip-subtitle">برای هر پلن قیمت، مدت پیش‌فرض و سهمیه روزانه را جداگانه تعیین کن.</p><div class="vip-config-table">'+rows+'</div><div class="detail-alert">مدت VIP بر اساس روز است؛ مثلاً یک پلن می‌تواند ۷ روز، ۱۵ روز یا ۳۰ روز باشد و محدود به ماه نیست.</div><div class="modal-actions"><button class="ghost" onclick="openVipDialog(window._profileResource)">انصراف</button><button class="primary" onclick="saveVipPlanSettings()">✓ تأیید و ذخیره پلن‌ها</button></div></div></div>';
 }
+
 function saveVipPlanSettings(){
- vipPlans.forEach(function(plan){const label=document.getElementById('vipPlanLabel_'+plan.key)?.value?.trim(),price=document.getElementById('vipPlanPrice_'+plan.key)?.value,months=document.getElementById('vipPlanMonths_'+plan.key)?.value,hours=document.getElementById('vipPlanHours_'+plan.key)?.value,after=document.getElementById('vipPlanAfter_'+plan.key)?.value,note=document.getElementById('vipPlanNote_'+plan.key)?.value?.trim();if(label)plan.label=label;plan.price=Math.max(0,Number(price||plan.price||0));plan.months=Math.max(1,Math.round(Number(months||plan.months||1)));plan.dailyHours=Math.max(0.5,Math.min(24,Number(hours||plan.dailyHours||2)));plan.afterLimit=after==='charge'?'charge':'block';plan.note=note||('روزانه '+plan.dailyHours+' ساعت رایگان')});normalizeAllVipPlans();persistAppState('vip-plans');showToast('پلن‌های VIP ذخیره شد');openVipDialog(window._profileResource);
+ vipPlans.forEach(function(plan){
+  const label=document.getElementById('vipPlanLabel_'+plan.key)?.value?.trim(),price=document.getElementById('vipPlanPrice_'+plan.key)?.value,days=document.getElementById('vipPlanDays_'+plan.key)?.value,hours=document.getElementById('vipPlanHours_'+plan.key)?.value,after=document.getElementById('vipPlanAfter_'+plan.key)?.value,note=document.getElementById('vipPlanNote_'+plan.key)?.value?.trim();
+  if(label)plan.label=label;
+  plan.price=Math.max(0,Number(price||plan.price||0));
+  plan.days=Math.max(1,Math.round(Number(days||plan.days||30)));
+  plan.dailyHours=Math.max(0.5,Math.min(24,Number(hours||plan.dailyHours||2)));
+  plan.afterLimit=after==='charge'?'charge':'block';
+  plan.note=note||('روزانه '+plan.dailyHours+' ساعت رایگان');
+ });
+ normalizeAllVipPlans();persistAppState('vip-plans');showToast('پلن‌های VIP ذخیره شد');openVipDialog(window._profileResource);
 }
+
 function openVipDialog(x){
- window._profileResource=x;normalizeAllVipPlans();const cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.id===x?.customer||v.name===x?.customer})||null;
- const planKey=x.vipPlanKey||(x.customer==='Armin'?'gold':x.customer==='Kian'?'silver':'silver'),plan=vipPlans.find(function(a){return a.key===planKey})||vipPlans[0];window._selectedVipPlan=plan.key;
- document.getElementById('detail').innerHTML='<div class="detail" onclick="if(event.target===this)closeDetail()"><div class="account-page vip-modal"><button class="close" onclick="openProfile(window._profileResource)">×</button><div class="eyebrow">VIP Membership</div><h2>اشتراک VIP مشتری</h2><p class="vip-subtitle">'+escapeHtml(x.customer||'Customer')+' • حساب '+escapeHtml((profileFor(x)||[])[1]||'—')+'</p><div class="vip-plan-tabs">'+vipPlans.map(function(v){return '<button type="button" class="ghost '+(v.key===plan.key?'selected':'')+'" onclick="selectVipPlan(\''+v.key+'\')"><strong>'+escapeHtml(v.label)+'</strong><small>'+Number(v.price||0).toLocaleString()+' تومان / ماه • '+escapeHtml(vipDailyText(v))+'</small></button>'}).join('')+'</div><div class="tariffGrid"><label>مدت اشتراک<select id="vipMonths" class="operation-select" onchange="updateVipPrice()">'+vipDurations.map(function(m){return '<option value="'+m+'" '+(m===Number(plan.months||1)?'selected':'')+'>'+m+' ماه</option>'}).join('')+'</select></label><label>قیمت نهایی<input id="vipPrice" value="'+Number(plan.price||0).toLocaleString()+'" readonly></label></div><div class="vip-benefits"><div><span>سطح</span><strong id="vipPlanName">'+escapeHtml(plan.label)+'</strong></div><div><span>سهمیه روزانه</span><strong id="vipDailyHoursText">'+escapeHtml(vipDailyText(plan))+'</strong></div><div><span>مدت پیش‌فرض</span><strong id="vipDurationText">'+Number(plan.months||1)+' ماه</strong></div></div><div class="vip-benefits vip-benefits-extended"><div><span>رفتار بعد از سهمیه</span><strong id="vipAfterLimitText">'+escapeHtml(vipAfterLimitText(plan))+'</strong></div><div><span>باقی‌مانده امروز</span><strong id="vipTodayRemainingText">'+formatSharedTime(getVipDailyRemainingSeconds(cc))+'</strong></div></div><div class="detail-alert" id="vipPlanNote">'+escapeHtml(plan.note||'')+' • '+escapeHtml(vipAfterLimitText(plan))+'</div><div class="modal-actions"><button class="ghost" onclick="openVipPlanSettings()">⚙ مدیریت پلن‌ها</button><button class="ghost" onclick="openProfile(window._profileResource)">انصراف</button><button class="primary" onclick="activateVip(window._selectedVipPlan)">خرید و فعال‌سازی</button></div></div></div>';
+ window._profileResource=x;normalizeAllVipPlans();
+ const cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.id===x?.customer||v.name===x?.customer})||null;
+ const planKey=x.vipPlanKey||(x.customer==='Armin'?'gold':x.customer==='Kian'?'silver':'silver'),plan=vipPlans.find(function(a){return a.key===planKey})||vipPlans[0];
+ window._selectedVipPlan=plan.key;
+ document.getElementById('detail').innerHTML='<div class="detail" onclick="if(event.target===this)closeDetail()"><div class="account-page vip-modal"><button class="close" onclick="openProfile(window._profileResource)">×</button><div class="eyebrow">VIP Membership</div><h2>اشتراک VIP مشتری</h2><p class="vip-subtitle">'+escapeHtml(x.customer||'Customer')+' • حساب '+escapeHtml((profileFor(x)||[])[1]||'—')+'</p><div class="vip-plan-tabs">'+vipPlans.map(function(v){return '<button type="button" class="ghost '+(v.key===plan.key?'selected':'')+'" onclick="selectVipPlan(\''+v.key+'\')"><strong>'+escapeHtml(v.label)+'</strong><small>'+Number(v.price||0).toLocaleString()+' تومان / '+Number(v.days||30)+' روز • '+escapeHtml(vipDailyText(v))+'</small></button>'}).join('')+'</div><div class="tariffGrid"><label>مدت اشتراک (روز)<input id="vipDays" class="operation-select" type="number" min="1" step="1" value="'+Number(plan.days||30)+'" oninput="updateVipPrice()"></label><label>قیمت نهایی<input id="vipPrice" value="'+Number(plan.price||0).toLocaleString()+'" readonly></label></div><div class="inline-operation-hint">مدت را مستقیم به تعداد روز وارد کن؛ مثلاً ۳، ۱۰ یا ۴۵ روز.</div><div class="vip-duration-presets"><button type="button" class="ghost" onclick="setVipDays(1)">۱ روز</button><button type="button" class="ghost" onclick="setVipDays(7)">۷ روز</button><button type="button" class="ghost" onclick="setVipDays(30)">۳۰ روز</button><button type="button" class="ghost" onclick="setVipDays(90)">۹۰ روز</button></div><div class="vip-benefits"><div><span>سطح</span><strong id="vipPlanName">'+escapeHtml(plan.label)+'</strong></div><div><span>سهمیه روزانه</span><strong id="vipDailyHoursText">'+escapeHtml(vipDailyText(plan))+'</strong></div><div><span>مدت انتخابی</span><strong id="vipDurationText">'+Number(plan.days||30)+' روز</strong></div></div><div class="vip-benefits vip-benefits-extended"><div><span>قیمت هر روز</span><strong id="vipPerDayPrice">'+Math.round(Number(plan.price||0)/Math.max(1,Number(plan.days||30))).toLocaleString()+' تومان</strong></div><div><span>رفتار بعد از سهمیه</span><strong id="vipAfterLimitText">'+escapeHtml(vipAfterLimitText(plan))+'</strong></div><div><span>باقی‌مانده امروز</span><strong id="vipTodayRemainingText">'+formatSharedTime(getVipDailyRemainingSeconds(cc))+'</strong></div></div><div class="detail-alert" id="vipPlanNote">'+escapeHtml(plan.note||'')+' • '+escapeHtml(vipAfterLimitText(plan))+'</div><div class="modal-actions"><button class="ghost" onclick="openVipPlanSettings()">⚙ مدیریت پلن‌ها</button><button class="ghost" onclick="openProfile(window._profileResource)">انصراف</button><button class="primary" onclick="activateVip(window._selectedVipPlan)">خرید و فعال‌سازی</button></div></div></div>';
+ updateVipPrice();
 }
+
 function selectVipPlan(key){
- const x=vipPlans.find(function(v){return v.key===key})||vipPlans[0];window._selectedVipPlan=x.key;document.querySelectorAll('.vip-plan-tabs button').forEach(function(btn){btn.classList.remove('selected')});document.querySelectorAll('.vip-plan-tabs button').forEach(function(btn){if(btn.textContent.trim().startsWith(x.label))btn.classList.add('selected')});const months=document.getElementById('vipMonths');if(months)months.value=String(x.months||1);if(document.getElementById('vipPrice'))document.getElementById('vipPrice').value=Number(x.price||0).toLocaleString();if(document.getElementById('vipPlanName'))document.getElementById('vipPlanName').textContent=x.label;if(document.getElementById('vipDailyHoursText'))document.getElementById('vipDailyHoursText').textContent=vipDailyText(x);if(document.getElementById('vipAfterLimitText'))document.getElementById('vipAfterLimitText').textContent=vipAfterLimitText(x);updateVipPrice();
+ const x=vipPlans.find(function(v){return v.key===key})||vipPlans[0];
+ window._selectedVipPlan=x.key;
+ document.querySelectorAll('.vip-plan-tabs button').forEach(function(btn){btn.classList.remove('selected')});
+ document.querySelectorAll('.vip-plan-tabs button').forEach(function(btn){if(btn.textContent.trim().startsWith(x.label))btn.classList.add('selected')});
+ const days=document.getElementById('vipDays');if(days)days.value=String(x.days||30);
+ if(document.getElementById('vipPlanName'))document.getElementById('vipPlanName').textContent=x.label;
+ if(document.getElementById('vipDailyHoursText'))document.getElementById('vipDailyHoursText').textContent=vipDailyText(x);
+ if(document.getElementById('vipAfterLimitText'))document.getElementById('vipAfterLimitText').textContent=vipAfterLimitText(x);
+ updateVipPrice();
 }
-function updateVipPrice(){const key=window._selectedVipPlan||'silver',plan=vipPlans.find(function(v){return v.key===key})||vipPlans[0],months=Math.max(1,Number(document.getElementById('vipMonths')?.value||plan.months||1));if(document.getElementById('vipPrice'))document.getElementById('vipPrice').value=(Number(plan.price||0)*months).toLocaleString();if(document.getElementById('vipDurationText'))document.getElementById('vipDurationText').textContent=months+' ماه';if(document.getElementById('vipDailyHoursText'))document.getElementById('vipDailyHoursText').textContent=vipDailyText(plan);if(document.getElementById('vipAfterLimitText'))document.getElementById('vipAfterLimitText').textContent=vipAfterLimitText(plan)}
-function addCalendarMonths(ts,months){const d=new Date(Number(ts||Date.now())),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+Math.max(0,Number(months||0)));const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return d.getTime()}
-function activateVip(key){const x=window._profileResource,cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.id===x?.customer||v.name===x?.customer}),plan=vipPlans.find(function(v){return v.key===key})||vipPlans[0],months=Math.max(1,Number(document.getElementById('vipMonths')?.value||plan.months||1)),price=Number(plan.price||0)*months;if(!cc){showToast('مشتری برای فعال‌سازی VIP پیدا نشد');return}const startBase=Number(cc.vipExpiryTs||0)>Date.now()?Number(cc.vipExpiryTs):Date.now(),expiryTs=addCalendarMonths(startBase,months),expiry=new Date(expiryTs).toLocaleDateString('fa-IR');if(!commitAccountOperation({action:'vip',customerId:cc.id,amount:price,planKey:plan.key,planLabel:plan.label,months:months,dailyHours:plan.dailyHours,afterLimit:plan.afterLimit,note:plan.note,expiryTs:expiryTs,expiry:expiry})){return}showToast('اشتراک '+plan.label+' • '+vipDailyText(plan)+' • '+months+' ماه ثبت شد');openProfile({id:'CUSTOMER'+cc.id,customer:cc.name,customerId:cc.id,type:'pc',state:'Idle',session:'—'})}
+
+function setVipDays(days){const input=document.getElementById('vipDays');if(input){input.value=String(Math.max(1,Math.round(Number(days||1))));updateVipPrice()}}
+
+function updateVipPrice(){
+ const key=window._selectedVipPlan||'silver',plan=vipPlans.find(function(v){return v.key===key})||vipPlans[0];
+ const days=Math.max(1,Math.round(Number(document.getElementById('vipDays')?.value||plan.days||30))),baseDays=Math.max(1,Number(plan.days||30)),dailyPrice=Number(plan.price||0)/baseDays,price=Math.round(dailyPrice*days);
+ if(document.getElementById('vipPrice'))document.getElementById('vipPrice').value=price.toLocaleString();
+ if(document.getElementById('vipDurationText'))document.getElementById('vipDurationText').textContent=days+' روز';
+ if(document.getElementById('vipPerDayPrice'))document.getElementById('vipPerDayPrice').textContent=Math.round(dailyPrice).toLocaleString()+' تومان';
+ if(document.getElementById('vipDailyHoursText'))document.getElementById('vipDailyHoursText').textContent=vipDailyText(plan);
+ if(document.getElementById('vipAfterLimitText'))document.getElementById('vipAfterLimitText').textContent=vipAfterLimitText(plan);
+}
+
+function addVipDays(ts,days){return Number(ts||Date.now())+Math.max(0,Math.round(Number(days||0)))*86400000}
+
+function activateVip(key){
+ const x=window._profileResource,cc=previewCustomers.find(function(v){return v.id===x?.customerId||v.id===x?.customer||v.name===x?.customer}),plan=vipPlans.find(function(v){return v.key===key})||vipPlans[0],days=Math.max(1,Math.round(Number(document.getElementById('vipDays')?.value||plan.days||30))),baseDays=Math.max(1,Number(plan.days||30)),price=Math.round((Number(plan.price||0)/baseDays)*days);
+ if(!cc){showToast('مشتری برای فعال‌سازی VIP پیدا نشد');return}
+ const startBase=Number(cc.vipExpiryTs||0)>Date.now()?Number(cc.vipExpiryTs):Date.now(),expiryTs=addVipDays(startBase,days),expiry=new Date(expiryTs).toLocaleDateString('fa-IR');
+ if(!commitAccountOperation({action:'vip',customerId:cc.id,amount:price,planKey:plan.key,planLabel:plan.label,days:days,dailyHours:plan.dailyHours,afterLimit:plan.afterLimit,note:plan.note,expiryTs:expiryTs,expiry:expiry})){return}
+ showToast('اشتراک '+plan.label+' • '+vipDailyText(plan)+' • '+days+' روز ثبت شد');
+ openProfile({id:'CUSTOMER'+cc.id,customer:cc.name,customerId:cc.id,type:'pc',state:'Idle',session:'—'});
+}
 
 const previewCustomers=[
   {id:'1040',name:'Ali R.',username:'ali.r',phone:'0912***21',balance:120000,debt:0,vip:'Gold',vipActive:true,vipExpiry:'1405/08/27',unit:'PC01',lastVisit:'Today'},
@@ -120,7 +183,7 @@ function applyAccountOperation(op,recordPayment){
   else if(op.action==='pay-debt'){let rem=amount;const debtBefore=Number(cc.debt||0),pay=Math.min(rem,debtBefore);cc.debt=Math.max(0,debtBefore-pay);rem-=pay;if(rem>0)cc.balance=Number(cc.balance||0)+rem;if(amount&&recordPayment!==false)addPayment(cc,amount,'نقدی',rem>0?'پرداخت بدهی + '+Math.round(rem).toLocaleString()+' تومان اعتبار':'پرداخت بدهی')}
   else if(op.action==='deduct'){let rem=amount,a=Math.min(Number(cc.balance||0),rem);cc.balance-=a;rem-=a;const f=Math.min(Number(cc.freeCredit||0),rem);cc.freeCredit-=f;rem-=f;if(rem>0)cc.debt=Number(cc.debt||0)+rem}
   else if(op.action==='discount'){const base=Math.max(0,Number(op.base||0)),bonus=Math.max(0,Number(op.bonus||0));cc.balance=Number(cc.balance||0)+base;cc.freeCredit=Number(cc.freeCredit||0)+bonus;if(recordPayment!==false)addPayment(cc,base,'نقدی / کارت','پرداخت + '+Number(op.percent||0)+'٪ هدیه')}
-  else if(op.action==='vip'){const price=Math.max(0,Number(op.amount||0)),plan=vipPlans.find(function(p){return p.key===op.planKey})||vipPlans[0];cc.vipActive=true;cc.vipPlan=op.planLabel||plan.label||'VIP';cc.vipPlanKey=op.planKey||plan.key;cc.vipMonths=Number(op.months||1);cc.vipDailyHours=Number(op.dailyHours||plan.dailyHours||2);cc.vipAfterLimit=op.afterLimit==='charge'?'charge':(plan.afterLimit||'block');cc.vipExpiryTs=Number(op.expiryTs||0)||addCalendarMonths(Date.now(),cc.vipMonths);cc.vipExpiry=op.expiry||new Date(cc.vipExpiryTs).toLocaleDateString('fa-IR');if(!cc.vipDailyUsageKey)cc.vipDailyUsageKey=vipDayKey();if(typeof cc.vipDailyUsedSeconds!=='number')cc.vipDailyUsedSeconds=0;if(recordPayment!==false)addPayment(cc,price,'نقدی','خرید '+cc.vipPlan+' • '+cc.vipMonths+' ماه • '+vipDailyText(plan)+' • '+vipAfterLimitText(plan))}
+  else if(op.action==='vip'){const price=Math.max(0,Number(op.amount||0)),plan=vipPlans.find(function(p){return p.key===op.planKey})||vipPlans[0],baseDays=Math.max(1,Number(plan.days||30)),days=Math.max(1,Math.round(Number(op.days||((op.months?Number(op.months)*30:0))||baseDays)));cc.vipActive=true;cc.vipPlan=op.planLabel||plan.label||'VIP';cc.vipPlanKey=op.planKey||plan.key;cc.vipDays=days;cc.vipDailyHours=Number(op.dailyHours||plan.dailyHours||2);cc.vipAfterLimit=op.afterLimit==='charge'?'charge':(plan.afterLimit||'block');cc.vipExpiryTs=Number(op.expiryTs||0)||addVipDays(Date.now(),days);cc.vipExpiry=op.expiry||new Date(cc.vipExpiryTs).toLocaleDateString('fa-IR');if(!cc.vipDailyUsageKey)cc.vipDailyUsageKey=vipDayKey();if(typeof cc.vipDailyUsedSeconds!=='number')cc.vipDailyUsedSeconds=0;if(recordPayment!==false)addPayment(cc,price,'نقدی','خرید '+cc.vipPlan+' • '+days+' روز • '+vipDailyText(plan)+' • '+vipAfterLimitText(plan))}
   else return false;
   return true;
 }
