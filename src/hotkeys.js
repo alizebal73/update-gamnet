@@ -33,12 +33,19 @@ function openHotkeyAccountAction(action){
   if(!c){openHotkeyCustomerSearch();return}
   window._hotkeyCustomer=c;
   window._profileResource=hotkeyResourceFromCustomer(c);
+  if(typeof inlineAccountAction==='function'){inlineAccountAction(action);return}
   if(action==='vip'){openVipDialog(window._profileResource);return}
   showAccountAction(action,window._profileResource);
 }
 
 
-function confirmActiveHotkeyOperation(){const p=document.getElementById('detail')?.querySelector('.operation-footer .primary');if(p){p.click();return true}return false}
+function confirmActiveHotkeyOperation(){
+  const panel=document.getElementById('inlineAccountOperation');
+  const action=panel?.dataset?.action;
+  if(panel&&!panel.hidden&&action&&typeof executeInlineAccountOperation==='function'){return executeInlineAccountOperation(action,null)}
+  const p=document.getElementById('detail')?.querySelector('.operation-footer .primary');if(p){p.click();return true}
+  return false
+}
 function openHotkeySettings(){
   const hk=getGameNetHotkeys(),ops=['openCustomer','chargeCustomer','deductCustomer','debtCustomer','freeCustomer','payDebtCustomer','discountCustomer','vipCustomer'],keys=['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'],sel=function(id,v){return '<select id="'+id+'" style="width:100%;height:32px">'+keys.map(function(k){return '<option value="'+k+'" '+(k===v?'selected':'')+'>'+k+'</option>'}).join('')+'</select>'};
   const rows=ops.map(function(k){return '<div class="account-row"><div class="account-row-label"><strong>'+gameNetHotkeyLabels[k]+'</strong><small>کلید اجرای مستقیم این عملیات</small></div><div></div>'+sel('hk_'+k,hk[k])+'</div>'}).join('');
