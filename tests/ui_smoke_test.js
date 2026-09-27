@@ -141,6 +141,25 @@ function loadScripts(context) {
       throw new Error('Script load failed: ' + rel + ' — ' + error.message);
     }
   }
+  const bridge = new vm.Script(`
+    globalThis.__ui = {
+      previewCustomers,
+      deviceTariffClass,
+      createPreviewCustomer,
+      openCustomerRecordPreview,
+      findHotkeyCustomer,
+      executeInlineAccountOperation,
+      getDeviceRate,
+      getDeviceTariff,
+      openDeviceSettings,
+      setDeviceTariffClassFromModal,
+      saveDeviceSettings,
+      commitAccountOperation,
+      openProfile,
+      window
+    };
+  `);
+  bridge.runInContext(ctx);
   return ctx;
 }
 
@@ -171,8 +190,9 @@ function staticChecks(ctx) {
 function runtimeFlowChecks(ctx) {
   const get = ctx.__getElement;
 
-  assert(Array.isArray(ctx.previewCustomers), 'previewCustomers is not available');
-  assert(ctx.previewCustomers.length >= 15, 'Expected seeded customers');
+  const ui = ctx.__ui;
+  assert(ui && Array.isArray(ui.previewCustomers), 'previewCustomers is not available');
+  assert(ui.previewCustomers.length >= 15, 'Expected seeded customers');
 
   const newId = '9901';
   get('newCId').value = newId;
@@ -182,43 +202,43 @@ function runtimeFlowChecks(ctx) {
   get('newCPhone').value = '09120009901';
   get('newCBalance').value = '100000';
 
-  ctx.createPreviewCustomer();
-  const created = ctx.previewCustomers.find((c) => c.id === newId);
+  ui.createPreviewCustomer();
+  const created = ui.previewCustomers.find((c) => c.id === newId);
   assert(created, 'Customer creation flow did not create the customer');
   assert(created.name === 'Smoke Test Customer', 'Created customer has wrong name');
 
-  ctx.openCustomerRecordPreview(newId);
+  ui.openCustomerRecordPreview(newId);
   assert(get('detail').innerHTML.includes('Smoke Test Customer'), 'Created customer profile did not render');
 
   get('hotkeyCustomerInput').value = '۱۰۴۰';
-  ctx.findHotkeyCustomer();
+  ui.findHotkeyCustomer();
   assert(get('detail').innerHTML.includes('Ali R.'), 'F1 customer search did not open the profile');
 
   const beforeCharge = Number(created.balance || 0);
   get('inlineAccountAmount').value = '10000';
-  ctx.executeInlineAccountOperation('charge', created);
+  ui.executeInlineAccountOperation('charge', created);
   assert(Number(created.balance) === beforeCharge + 10000, 'Charge operation did not update balance');
 
   const beforeFree = Number(created.freeCredit || 0);
   get('inlineAccountAmount').value = '10000';
   get('inlineDiscountPercent').value = '10';
-  ctx.executeInlineAccountOperation('discount', created);
+  ui.executeInlineAccountOperation('discount', created);
   assert(Number(created.balance) === beforeCharge + 20000, 'Discount payment did not preserve actual paid amount');
   assert(Number(created.freeCredit) === beforeFree + 1000, 'Discount bonus was not added correctly');
 
-  assert(ctx.getDeviceRate('PC01') === 200000, 'Normal PC tariff derivation is wrong');
-  ctx.openDeviceSettings('PC01');
+  assert(ui.getDeviceRate('PC01') === 200000, 'Normal PC tariff derivation is wrong');
+  ui.openDeviceSettings('PC01');
   assert(get('detail').innerHTML.includes('تأیید و ذخیره'), 'Device settings confirmation button is missing');
-  ctx.setDeviceTariffClassFromModal('PC01', 'vip');
-  assert(ctx.window._pendingDeviceTariff?.cls === 'vip', 'Device VIP selection was not staged');
-  assert(ctx.getDeviceTariff('PC01') === 'normal', 'Device class changed before confirmation');
-  ctx.saveDeviceSettings();
-  assert(ctx.getDeviceTariff('PC01') === 'vip', 'Device VIP setting was not saved');
+  ui.setDeviceTariffClassFromModal('PC01', 'vip');
+  assert(ui.window._pendingDeviceTariff?.cls === 'vip', 'Device VIP selection was not staged');
+  assert(ui.getDeviceTariff('PC01') === 'normal', 'Device class changed before confirmation');
+  ui.saveDeviceSettings();
+  assert(ui.getDeviceTariff('PC01') === 'vip', 'Device VIP setting was not saved');
   assert(get('detail').innerHTML.includes('دستگاه‌ها و کلاس تعرفه'), 'Device save did not return to device manager');
-  assert(ctx.getDeviceRate('PC01') === 100000, 'VIP PC tariff derivation is wrong');
+  assert(ui.getDeviceRate('PC01') === 100000, 'VIP PC tariff derivation is wrong');
 
-  assert(typeof ctx.commitAccountOperation === 'function', 'Financial operation engine missing');
-  assert(typeof ctx.openProfile === 'function', 'Profile renderer missing');
+  assert(typeof ui.commitAccountOperation === 'function', 'Financial operation engine missing');
+  assert(typeof ui.openProfile === 'function', 'Profile renderer missing');
 }
 
 function main() {
