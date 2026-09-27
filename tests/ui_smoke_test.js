@@ -231,11 +231,12 @@ function runtimeFlowChecks(ctx) {
   assert(Number(created.debt) === 0, 'Debt payment did not clear the debt first');
   assert(Number(created.balance) === debtBeforeBalance + 10000, 'Debt payment remainder was not added to customer credit/time');
 
+  const beforeDiscountBalance = Number(created.balance || 0);
   const beforeFree = Number(created.freeCredit || 0);
   get('inlineAccountAmount').value = '10000';
   get('inlineDiscountPercent').value = '10';
   ui.executeInlineAccountOperation('discount', created);
-  assert(Number(created.balance) === beforeCharge + 20000, 'Discount payment did not preserve actual paid amount');
+  assert(Number(created.balance) === beforeDiscountBalance + 10000, 'Discount payment did not preserve actual paid amount');
   assert(Number(created.freeCredit) === beforeFree + 1000, 'Discount bonus was not added correctly');
 
   assert(ui.getDeviceRate('PC01') === 200000, 'Normal PC tariff derivation is wrong');
