@@ -26,6 +26,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Run UI smoke tests
+        shell: bash
+        run: node tests/ui_smoke_test.js
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 
