@@ -160,6 +160,7 @@ function loadScripts(context) {
       vipPlans,
       openVipPlanSettings,
       saveVipPlanSettings,
+      updateVipPrice,
       openVipDialog,
       openCustomerEdit,
       saveCustomerEdit,
