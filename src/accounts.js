@@ -49,7 +49,7 @@ function inlineAccountAction(action){
   if(!panel||!input){openProfile(resource);return}
   panel.dataset.action=action;
   const hk=typeof getGameNetHotkeys==='function'?getGameNetHotkeys():{};
-  const labels={charge:'شارژ اعتبار',deduct:'کسر اعتبار',debt:'ثبت بدهی',pay-debt:'پرداخت بدهی',free:'اعتبار رایگان',discount:'پرداخت + هدیه',vip:'خرید / تمدید VIP'};
+  const labels={charge:'شارژ اعتبار',deduct:'کسر اعتبار',debt:'ثبت بدهی','pay-debt':'پرداخت بدهی',free:'اعتبار رایگان',discount:'پرداخت + هدیه',vip:'خرید / تمدید VIP'};
   const title=document.getElementById('inlineOperationTitle'),hint=document.getElementById('inlineOperationHint'),badge=document.getElementById('inlineSelectedHotkey'),extra=document.getElementById('inlineDiscountExtra');
   if(title)title.textContent=labels[action]||'مبلغ عملیات';
   if(hint)hint.textContent=action==='vip'?'VIP از پلن و مدت انتخاب می‌شود.':(action==='discount'?'مبلغ پرداختی را وارد کن و درصد هدیه را انتخاب کن.':'مبلغ را وارد کن و همین کارت یا هات‌کی را بزن.');
