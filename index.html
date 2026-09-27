@@ -18,6 +18,29 @@
 <aside class="sidePanel"><section class="panel mini"><div class="head"><div><h3>Live activity</h3><p>Latest events</p></div></div><div id="events"></div></section><section class="panel mini"><div class="head"><div><h3>System health</h3><p>Branch runtime</p></div></div><div class="health"><div><i class="dot"></i><span>Local Server</span><b>Online</b></div><div><i class="dot"></i><span>LAN</span><b>15 / 15</b></div><div><i class="dot warn"></i><span>Alerts</span><b>2</b></div><div><i class="dot"></i><span>Global Sync</span><b>Healthy</b></div></div></section></aside></div>
 </main></section></div>
 <div id="detail"></div><div id="context"></div><div id="toast"></div>
+<script>
+(function(){
+  function reportRuntimeError(message){
+    var el=document.getElementById('toast');
+    if(!el)return;
+    el.textContent='خطای رابط کاربری: '+message;
+    el.style.display='block';
+    el.style.position='fixed';
+    el.style.left='20px';
+    el.style.bottom='20px';
+    el.style.zIndex='99999';
+    el.style.padding='10px 14px';
+    el.style.background='#fff5f5';
+    el.style.border='1px solid #efcaca';
+    el.style.color='#a33b3b';
+    el.style.borderRadius='8px';
+    el.style.fontSize='11px';
+    el.style.direction='rtl';
+  }
+  window.addEventListener('error',function(e){reportRuntimeError(e.message||'JavaScript error')});
+  window.addEventListener('unhandledrejection',function(e){reportRuntimeError(String(e.reason&&e.reason.message||e.reason||'Promise error'))});
+})();
+</script>
 <script src="./src/core.js?v=20260927-1530"></script>
 <script src="./src/accounts.js?v=20260927-1530"></script>
 <script src="./src/sessions.js?v=20260927-1530"></script>
