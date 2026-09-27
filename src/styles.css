@@ -13,3 +13,19 @@ body{min-width:1024px}.app{display:flex;height:100vh;width:100vw}.side{display:n
 .staff-grid{display:grid;grid-template-columns:1.3fr .9fr .8fr 1.3fr 1.25fr .8fr 1.1fr}
 .create-customer-modal{width:600px}.permissions-modal{width:700px;max-height:88vh;overflow:auto}
 .account-select-action{width:100%;height:27px;border:1px solid #dfe5ed;border-radius:5px;background:#f9fbfd;padding:0 7px;font-size:9px;color:#33435c}.shared-time-example{font-size:9px!important;color:#2f6fed!important;font-weight:800!important}.concurrent-preview-row{background:#fbfdff}
+
+/* Account Center direct-operation controls */
+.account-center-page{width:780px;max-width:calc(100vw - 32px)}
+.account-center-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-top:4px}
+.account-center-heading h2{margin:2px 0 3px;font-size:17px}
+.account-center-heading p{margin:0;color:#8995a6;font-size:9px}
+.hotkey-search-badge{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;border:1px solid #d7e0ec;border-radius:7px;background:#f7f9fc;color:#475670;padding:6px 9px;font-size:9px;font-weight:800}
+.account-quick-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
+.account-op-button{position:relative;min-height:82px;border:1px solid #dfe5ed;border-radius:9px;background:#f9fbfd;color:#263650;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;padding:12px 8px 10px;transition:.15s ease}
+.account-op-button:hover{border-color:#9db8ee;background:#f2f6ff;transform:translateY(-1px);box-shadow:0 5px 16px rgba(47,111,237,.08)}
+.account-op-button:active{transform:translateY(0)}
+.account-op-icon{font-size:18px;line-height:1}
+.account-op-label{font-size:10px;font-weight:800}
+.account-op-hotkey{position:absolute;top:7px;left:7px;min-width:28px;padding:3px 5px;border-radius:5px;background:#202b40;color:#fff;font-size:8px;font-weight:800;text-align:center}
+.account-center-hint{margin-top:10px}
+@media (max-width:700px){.account-quick-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.account-center-heading{flex-direction:column}}
