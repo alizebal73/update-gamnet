@@ -207,7 +207,14 @@ function runtimeFlowChecks(ctx) {
   assert(Number(created.freeCredit) === beforeFree + 1000, 'Discount bonus was not added correctly');
 
   assert(ctx.getDeviceRate('PC01') === 200000, 'Normal PC tariff derivation is wrong');
-  ctx.deviceTariffClass['PC01'] = 'vip';
+  ctx.openDeviceSettings('PC01');
+  assert(get('detail').innerHTML.includes('تأیید و ذخیره'), 'Device settings confirmation button is missing');
+  ctx.setDeviceTariffClassFromModal('PC01', 'vip');
+  assert(ctx.window._pendingDeviceTariff?.cls === 'vip', 'Device VIP selection was not staged');
+  assert(ctx.getDeviceTariff('PC01') === 'normal', 'Device class changed before confirmation');
+  ctx.saveDeviceSettings();
+  assert(ctx.getDeviceTariff('PC01') === 'vip', 'Device VIP setting was not saved');
+  assert(get('detail').innerHTML.includes('دستگاه‌ها و کلاس تعرفه'), 'Device save did not return to device manager');
   assert(ctx.getDeviceRate('PC01') === 100000, 'VIP PC tariff derivation is wrong');
 
   assert(typeof ctx.commitAccountOperation === 'function', 'Financial operation engine missing');
